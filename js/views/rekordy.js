@@ -1,4 +1,4 @@
-import { mockPR, PR_LABELS, parsujCzasDoSekund, formatujSekundyDoCzasu, zapiszPR } from "../state.js";
+import { mockPR, PR_LABELS, parsujCzasDoSekund, zapiszPR } from "../state.js";
 
 function wartoscNumeryczna(kierunek, wartosc) {
   return kierunek === "malejaco" ? parsujCzasDoSekund(String(wartosc)) : Number(wartosc);
@@ -6,6 +6,7 @@ function wartoscNumeryczna(kierunek, wartosc) {
 
 function najlepszyWpis(kategoria) {
   const { kierunek, wpisy } = kategoria;
+  if (!wpisy.length) return null;
   return wpisy.reduce((best, w) => {
     const wB = wartoscNumeryczna(kierunek, best.wartosc);
     const wW = wartoscNumeryczna(kierunek, w.wartosc);
@@ -46,45 +47,60 @@ function miniWykres(kategoria) {
   `;
 }
 
-function formatujWartosc(kierunek, wartosc) {
-  return kierunek === "malejaco" ? wartosc : wartosc;
+function formatujWartosc(wartosc, jednostka) {
+  return jednostka ? `${wartosc} ${jednostka}` : wartosc;
 }
 
 export function mount(container, wroc) {
+  function znajdzKategorie(id) {
+    return mockPR[id] || mockPR.wlasne.find((k) => k.id === id);
+  }
+
+  function kartaHtml(id, kategoria, nazwa) {
+    const najlepszy = najlepszyWpis(kategoria);
+    return `
+      <div class="pr-card">
+        <div class="pr-card-header">
+          <span class="pr-nazwa">${nazwa}</span>
+          <span class="pr-najlepszy">${
+            najlepszy ? formatujWartosc(najlepszy.wartosc, kategoria.jednostka) : "Brak wpisów"
+          }</span>
+        </div>
+        ${najlepszy ? miniWykres(kategoria) : `<p class="brak-wykresu">Dodaj pierwszy wynik.</p>`}
+        <button class="dodaj-btn maly" data-action="dodaj-wpis" data-kategoria="${id}">+ Dodaj wynik</button>
+        <div class="pr-formularz" data-formularz="${id}"></div>
+      </div>
+    `;
+  }
+
   function render() {
-    const karty = Object.entries(mockPR)
-      .map(([id, kategoria]) => {
-        const najlepszy = najlepszyWpis(kategoria);
-        return `
-          <div class="pr-card">
-            <div class="pr-card-header">
-              <span class="pr-nazwa">${PR_LABELS[id] || id}</span>
-              <span class="pr-najlepszy">${formatujWartosc(kategoria.kierunek, najlepszy.wartosc)}</span>
-            </div>
-            ${miniWykres(kategoria)}
-            <button class="dodaj-btn maly" data-action="dodaj-wpis" data-kategoria="${id}">+ Dodaj wynik</button>
-            <div class="pr-formularz" data-formularz="${id}"></div>
-          </div>
-        `;
-      })
+    const stale = Object.entries(mockPR)
+      .filter(([id]) => id !== "wlasne")
+      .map(([id, kategoria]) => kartaHtml(id, kategoria, PR_LABELS[id] || id))
       .join("");
+
+    const wlasne = mockPR.wlasne.map((kategoria) => kartaHtml(kategoria.id, kategoria, kategoria.nazwa)).join("");
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wroc">‹ Więcej</button>
       <div class="topbar"><span class="data">Rekordy personalne</span></div>
-      ${karty}
+      ${stale}
+      ${wlasne}
+      <button class="dodaj-btn" data-action="pokaz-formularz-kategorii">+ Dodaj własną kategorię</button>
+      <div id="kategoria-formularz"></div>
     `;
 
     container.querySelector("[data-action='wroc']").onclick = wroc;
     container.querySelectorAll("[data-action='dodaj-wpis']").forEach((btn) => {
       btn.onclick = () => pokazFormularzWpisu(btn.dataset.kategoria);
     });
+    container.querySelector("[data-action='pokaz-formularz-kategorii']").onclick = pokazFormularzKategorii;
   }
 
   function pokazFormularzWpisu(id) {
+    const kategoria = znajdzKategorie(id);
     const miejsce = container.querySelector(`[data-formularz="${id}"]`);
-    const kierunek = mockPR[id].kierunek;
-    const placeholder = kierunek === "malejaco" ? "np. 4:28 (M:SS)" : "np. 9";
+    const placeholder = kategoria.kierunek === "malejaco" ? "np. 4:28 (M:SS)" : "np. 9";
     miejsce.innerHTML = `
       <div class="mini-formularz">
         <input type="text" class="pr-wartosc-input" placeholder="${placeholder}" />
@@ -95,7 +111,31 @@ export function mount(container, wroc) {
       const input = miejsce.querySelector(".pr-wartosc-input");
       const wartosc = input.value.trim();
       if (!wartosc) return;
-      mockPR[id].wpisy.push({ data: new Date().toISOString().slice(0, 10), wartosc });
+      kategoria.wpisy.push({ data: new Date().toISOString().slice(0, 10), wartosc });
+      zapiszPR();
+      render();
+    };
+  }
+
+  function pokazFormularzKategorii() {
+    const miejsce = container.querySelector("#kategoria-formularz");
+    miejsce.innerHTML = `
+      <div class="mini-formularz">
+        <input type="text" id="kat-nazwa" placeholder="Nazwa (np. Wyciskanie leżąc)" />
+        <input type="text" id="kat-jednostka" placeholder="Jednostka (np. kg) — opcjonalnie" />
+        <select id="kat-kierunek">
+          <option value="rosnaco">Wyższy wynik = lepiej</option>
+          <option value="malejaco">Niższy wynik = lepiej</option>
+        </select>
+        <button data-action="zapisz-kategorie">Dodaj</button>
+      </div>
+    `;
+    miejsce.querySelector("[data-action='zapisz-kategorie']").onclick = () => {
+      const nazwa = miejsce.querySelector("#kat-nazwa").value.trim();
+      if (!nazwa) return;
+      const jednostka = miejsce.querySelector("#kat-jednostka").value.trim();
+      const kierunek = miejsce.querySelector("#kat-kierunek").value;
+      mockPR.wlasne.push({ id: `custom_${Date.now()}`, nazwa, jednostka, kierunek, wpisy: [] });
       zapiszPR();
       render();
     };

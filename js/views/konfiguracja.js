@@ -10,6 +10,16 @@ import {
   importujDane,
 } from "../state.js";
 
+// Telefony (zwłaszcza iPhone przy wpisywaniu/wklejaniu przez niektóre pola)
+// potrafią podmienić proste cudzysłowy " i ' na "inteligentne" wersje typu
+// " " „ ‟ ‘ ’ — dla oka wygląda tak samo, ale JSON.parse się na tym wywala.
+// Zamieniamy je z powrotem na zwykłe ASCII przed parsowaniem.
+function naprawCudzyslowy(tekst) {
+  return tekst
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+}
+
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
 Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej — bez tekstu przed/po, bez code fence markdown.
@@ -88,7 +98,7 @@ export function mount(container, wroc) {
     if (!plik) return;
 
     try {
-      const tekst = await plik.text();
+      const tekst = naprawCudzyslowy(await plik.text());
       const dane = JSON.parse(tekst);
       await importujDane(dane);
       renderKrok1();
@@ -268,7 +278,7 @@ export function mount(container, wroc) {
 
     container.querySelector("[data-action='importuj']").onclick = () => {
       const komunikat = container.querySelector("#import-komunikat");
-      const surowyTekst = container.querySelector("#import-textarea").value.trim();
+      const surowyTekst = naprawCudzyslowy(container.querySelector("#import-textarea").value.trim());
       try {
         const dane = JSON.parse(surowyTekst);
         if (!dane.dni || typeof dane.dni !== "object") {

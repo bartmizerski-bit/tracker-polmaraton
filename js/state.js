@@ -105,6 +105,7 @@ export const mockPR = {
   czas_1km: { kierunek: "malejaco", wpisy: [] },
   czas_5km: { kierunek: "malejaco", wpisy: [] },
   podciagniecia_neutralne: { kierunek: "rosnaco", wpisy: [] },
+  wlasne: [],
 };
 
 export function parsujCzasDoSekund(str) {
@@ -242,6 +243,7 @@ export async function wyczyscWszystkieDane() {
   mockPR.czas_1km.wpisy = [];
   mockPR.czas_5km.wpisy = [];
   mockPR.podciagniecia_neutralne.wpisy = [];
+  mockPR.wlasne = [];
 
   mockProfil.wzrost_cm = "";
   mockProfil.wiek = "";
