@@ -22,7 +22,7 @@ function naprawCudzyslowy(tekst) {
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
-Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej — bez tekstu przed/po, bez code fence markdown.
+Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
 
 Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
 
@@ -107,6 +107,25 @@ export function mount(container, wroc) {
     } catch (err) {
       const komunikat = container.querySelector("#backup-komunikat");
       if (komunikat) komunikat.innerHTML = `<p class="komunikat-blad">Nie udało się wczytać pliku: ${err.message}</p>`;
+    }
+  }
+
+  async function obslugaImportuPlanu(event) {
+    const plik = event.target.files[0];
+    if (!plik) return;
+    const komunikat = container.querySelector("#import-komunikat");
+
+    try {
+      const surowyTekst = naprawCudzyslowy(await plik.text());
+      const dane = JSON.parse(surowyTekst);
+      if (!dane.dni || typeof dane.dni !== "object") {
+        throw new Error("Brak sekcji 'dni' w pliku.");
+      }
+      Object.assign(mockPlan, dane.dni);
+      zapiszPlan();
+      komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${Object.keys(dane.dni).length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
+    } catch (err) {
+      komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny plik JSON zgodny ze schematem: ${err.message}</p>`;
     }
   }
 
@@ -258,9 +277,9 @@ export function mount(container, wroc) {
       <pre class="ai-instrukcja">${instrukcja}</pre>
       <button class="dodaj-btn" data-action="kopiuj">Kopiuj instrukcję</button>
 
-      <div class="sekcja-naglowek">2. Wklej wygenerowany JSON</div>
-      <textarea class="import-textarea" id="import-textarea" placeholder="Wklej tu odpowiedź od AI (sam JSON)"></textarea>
-      <button class="dodaj-btn" data-action="importuj">Zaimportuj plan</button>
+      <div class="sekcja-naglowek">2. Zapisz odpowiedź AI jako plik .json i zaimportuj</div>
+      <button class="dodaj-btn" data-action="importuj-plan-wybierz">Wybierz plik .json</button>
+      <input type="file" accept="application/json,.json" id="import-plan-plik" style="display:none" />
       <div id="import-komunikat"></div>
     `;
 
@@ -276,21 +295,10 @@ export function mount(container, wroc) {
       });
     };
 
-    container.querySelector("[data-action='importuj']").onclick = () => {
-      const komunikat = container.querySelector("#import-komunikat");
-      const surowyTekst = naprawCudzyslowy(container.querySelector("#import-textarea").value.trim());
-      try {
-        const dane = JSON.parse(surowyTekst);
-        if (!dane.dni || typeof dane.dni !== "object") {
-          throw new Error("Brak sekcji 'dni' w pliku.");
-        }
-        Object.assign(mockPlan, dane.dni);
-        zapiszPlan();
-        komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${Object.keys(dane.dni).length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
-      } catch (err) {
-        komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny JSON zgodny ze schematem: ${err.message}</p>`;
-      }
+    container.querySelector("[data-action='importuj-plan-wybierz']").onclick = () => {
+      container.querySelector("#import-plan-plik").click();
     };
+    container.querySelector("#import-plan-plik").onchange = obslugaImportuPlanu;
   }
 
   renderKrok1();
