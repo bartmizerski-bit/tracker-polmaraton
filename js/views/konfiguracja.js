@@ -61,7 +61,7 @@ export function mount(container, wroc) {
   async function eksportuj() {
     const dane = eksportujDane();
     const tekst = JSON.stringify(dane, null, 2);
-    const nazwaPliku = `backup-po-co-mi-to-bylo-${new Date().toISOString().slice(0, 10)}.json`;
+    const nazwaPliku = `backup-do-startu-${new Date().toISOString().slice(0, 10)}.json`;
     const plik = new File([tekst], nazwaPliku, { type: "application/json" });
 
     if (navigator.canShare && navigator.canShare({ files: [plik] })) {

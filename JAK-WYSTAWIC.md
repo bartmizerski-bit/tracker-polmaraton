@@ -34,7 +34,7 @@ Na stronie nowo utworzonego repozytorium:
 ## 5. Sprawdź, czy działa
 
 - Otwórz ten link na telefonie (w Chrome na Androidzie albo Safari na iOS).
-- Powinieneś zobaczyć napis "Po co mi to było — Szkielet techniczny gotowy".
+- Powinieneś zobaczyć aplikację "Do Startu".
 - Na Androidzie: powinna pojawić się opcja "Dodaj do ekranu głównego" / "Zainstaluj aplikację".
 - Na iOS: w Safari kliknij ikonę udostępniania → "Dodaj do ekranu początkowego".
 

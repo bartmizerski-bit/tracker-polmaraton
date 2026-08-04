@@ -1,6 +1,6 @@
 {
-  "name": "Po co mi to było — Tracker Treningowy",
-  "short_name": "Po co mi to było",
+  "name": "Do Startu — Tracker Treningowy",
+  "short_name": "Do Startu",
   "description": "Tracker treningowy do przygotowań do półmaratonu i kalisteniki.",
   "start_url": "./index.html",
   "scope": "./",
