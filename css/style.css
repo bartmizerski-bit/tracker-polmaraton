@@ -1,0 +1,261 @@
+/* Paleta ustalona wcześniej w projekcie */
+:root {
+  --color-ink: #0d0d1a;
+  --color-ink-light: #16162a;
+  --color-track-red: #d81e2c;
+  --color-lime: #b6ff3c;
+  --color-text: #f4f4f4;
+  --color-text-muted: #9a9aa8;
+
+  --font-display: "Bebas Neue", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1rem 2rem;
+  max-width: 480px;
+  margin: 0 auto;
+  gap: 1rem;
+}
+
+/* Nagłówek dnia */
+.topbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.topbar .data {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.topbar .komentarz {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+/* Przyciski stanu dnia */
+.day-state-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.day-state-btn {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-text-muted);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.day-state-btn.active-przerwa {
+  border-color: var(--color-text-muted);
+  background: var(--color-ink-light);
+  color: var(--color-text);
+}
+
+.day-state-btn.active-len {
+  border-color: var(--color-track-red);
+  background: var(--color-track-red);
+  color: var(--color-text);
+}
+
+/* Elementy stałe dnia: km marszu + trzymanie michy */
+.fixed-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--color-ink-light);
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+}
+
+.fixed-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fixed-item label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.km-input {
+  width: 4.5rem;
+  background: var(--color-ink);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.fixed-divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Checkbox binarny (km potwierdzenie, trzymanie michy) */
+.checkbox-binary {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--color-track-red);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.checkbox-binary.checked {
+  background: var(--color-lime);
+  border-color: var(--color-lime);
+}
+.checkbox-binary.checked::after {
+  content: "✓";
+  color: var(--color-ink);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Kafelek kategorii */
+.tile {
+  background: var(--color-ink-light);
+  border-radius: 16px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tile-header .tile-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: 0.02em;
+}
+
+/* Tristate checkbox — sygnaturowy element apki */
+.tristate {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2.5px solid var(--color-track-red);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.tristate[data-state="czesciowo"] {
+  background: linear-gradient(90deg, var(--color-lime) 50%, transparent 50%);
+}
+
+.tristate[data-state="zrealizowany"] {
+  background: var(--color-lime);
+  border-color: var(--color-lime);
+}
+.tristate[data-state="zrealizowany"]::after {
+  content: "✓";
+  color: var(--color-ink);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.tile-body {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.tile-body .opis {
+  margin: 0 0 0.4rem;
+}
+
+.tile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.tile-meta span strong {
+  color: var(--color-lime);
+  font-weight: 600;
+}
+
+.exercise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.exercise-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.exercise-list li::before {
+  content: "–";
+  margin-right: 0.4rem;
+  color: var(--color-track-red);
+}
+
+.exercise-list li .ilosc {
+  color: var(--color-lime);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Stan dnia zastępujący kafelki (przerwa / leń) */
+.day-off-message {
+  background: var(--color-ink-light);
+  border-radius: 16px;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
