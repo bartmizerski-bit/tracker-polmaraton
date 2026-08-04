@@ -5,6 +5,7 @@ import {
   cycleTristate,
   getPlanDay,
   getRealizacja,
+  zapiszRealizacje,
 } from "../state.js";
 
 function formatujDate(dateKey) {
@@ -133,11 +134,13 @@ export function mount(container, dateKey) {
       realizacja.stan_dnia = realizacja.stan_dnia === wartosc ? "normalny" : wartosc;
     }
     render();
+    zapiszRealizacje(dateKey);
   };
 
   container.oninput = (event) => {
     if (event.target.dataset.field === "km-marsz") {
       realizacja.km_marsz.wartosc = event.target.value;
+      zapiszRealizacje(dateKey);
     }
   };
 

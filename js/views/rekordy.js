@@ -1,4 +1,4 @@
-import { mockPR, PR_LABELS, parsujCzasDoSekund, formatujSekundyDoCzasu } from "../state.js";
+import { mockPR, PR_LABELS, parsujCzasDoSekund, formatujSekundyDoCzasu, zapiszPR } from "../state.js";
 
 function wartoscNumeryczna(kierunek, wartosc) {
   return kierunek === "malejaco" ? parsujCzasDoSekund(String(wartosc)) : Number(wartosc);
@@ -96,6 +96,7 @@ export function mount(container, wroc) {
       const wartosc = input.value.trim();
       if (!wartosc) return;
       mockPR[id].wpisy.push({ data: new Date().toISOString().slice(0, 10), wartosc });
+      zapiszPR();
       render();
     };
   }

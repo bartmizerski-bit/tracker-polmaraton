@@ -1,4 +1,4 @@
-import { mockProfil, mockWpisyWagi, obliczBMI } from "../state.js";
+import { mockProfil, mockWpisyWagi, obliczBMI, zapiszProfil, zapiszWpisyWagi } from "../state.js";
 
 function ostatniWpis() {
   const posortowane = [...mockWpisyWagi].sort((a, b) => (a.data > b.data ? 1 : -1));
@@ -79,6 +79,7 @@ export function mount(container, wroc) {
       input.onchange = (e) => {
         const pole = e.target.dataset.field === "wzrost" ? "wzrost_cm" : "wiek";
         mockProfil[pole] = Number(e.target.value);
+        zapiszProfil();
         render();
       };
     });
@@ -99,6 +100,7 @@ export function mount(container, wroc) {
       const istniejacy = mockWpisyWagi.find((w) => w.data === dzis);
       if (istniejacy) istniejacy.waga_kg = wartosc;
       else mockWpisyWagi.push({ data: dzis, waga_kg: wartosc });
+      zapiszWpisyWagi();
       render();
     };
   }

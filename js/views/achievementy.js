@@ -1,4 +1,4 @@
-import { mockAchievementyAutomatyczne, mockAchievementyWlasne } from "../state.js";
+import { mockAchievementyAutomatyczne, mockAchievementyWlasne, zapiszAchievementyWlasne } from "../state.js";
 
 export function mount(container, wroc) {
   function render() {
@@ -69,6 +69,7 @@ export function mount(container, wroc) {
         opis,
         data: new Date().toISOString().slice(0, 10),
       });
+      zapiszAchievementyWlasne();
       render();
     };
   }

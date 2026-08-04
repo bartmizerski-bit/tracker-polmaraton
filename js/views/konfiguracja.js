@@ -1,4 +1,4 @@
-import { mockProfil, mockPlan, mockWpisyWagi } from "../state.js";
+import { mockProfil, mockPlan, mockWpisyWagi, zapiszProfil, zapiszWpisyWagi, zapiszPlan } from "../state.js";
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
@@ -146,8 +146,10 @@ export function mount(container, wroc) {
         const istniejacy = mockWpisyWagi.find((w) => w.data === dzis);
         if (istniejacy) istniejacy.waga_kg = waga;
         else mockWpisyWagi.push({ data: dzis, waga_kg: waga });
+        zapiszWpisyWagi();
       }
 
+      zapiszProfil();
       krok = 2;
       renderKrok2();
     };
@@ -195,6 +197,7 @@ export function mount(container, wroc) {
           throw new Error("Brak sekcji 'dni' w pliku.");
         }
         Object.assign(mockPlan, dane.dni);
+        zapiszPlan();
         komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${Object.keys(dane.dni).length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
       } catch (err) {
         komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny JSON zgodny ze schematem: ${err.message}</p>`;

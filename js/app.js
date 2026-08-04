@@ -1,5 +1,5 @@
 // Punkt wejścia — rejestracja service workera + przełączanie zakładek/podwidoków.
-import { toKey } from "./state.js";
+import { toKey, inicjalizujStan } from "./state.js";
 import { mount as mountDzien } from "./views/dzien.js";
 import { mount as mountTydzien } from "./views/tydzien.js";
 import { mount as mountStatystyki } from "./views/statystyki.js";
@@ -74,4 +74,4 @@ function renderApp() {
   }
 }
 
-renderApp();
+inicjalizujStan().finally(renderApp);

@@ -227,3 +227,76 @@ export function formatujSekundyDoCzasu(sek) {
   const s = Math.round(sek % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
+
+// --- Wczytywanie i zapisywanie do IndexedDB ---
+import { dbGet, dbSet, dbGetAll } from "./db.js";
+
+export async function inicjalizujStan() {
+  try {
+    const [profil, plan, wpisyWagi, pr, achWlasne, dni] = await Promise.all([
+      dbGet("meta", "profil"),
+      dbGet("meta", "plan"),
+      dbGet("meta", "wpisyWagi"),
+      dbGet("meta", "pr"),
+      dbGet("meta", "achievementyWlasne"),
+      dbGetAll("dni"),
+    ]);
+
+    if (profil) Object.assign(mockProfil, profil);
+    if (plan) Object.assign(mockPlan, plan);
+    if (wpisyWagi) mockWpisyWagi.splice(0, mockWpisyWagi.length, ...wpisyWagi);
+    if (pr) Object.assign(mockPR, pr);
+    if (achWlasne) mockAchievementyWlasne.splice(0, mockAchievementyWlasne.length, ...achWlasne);
+    if (dni && Object.keys(dni).length) Object.assign(mockRealizacja, dni);
+  } catch (err) {
+    console.warn("Nie udało się wczytać zapisanych danych, używam wartości domyślnych.", err);
+  }
+}
+
+export async function zapiszRealizacje(dateKey) {
+  try {
+    await dbSet("dni", dateKey, mockRealizacja[dateKey]);
+  } catch (err) {
+    console.warn("Nie udało się zapisać dnia:", err);
+  }
+}
+
+export async function zapiszProfil() {
+  try {
+    await dbSet("meta", "profil", mockProfil);
+  } catch (err) {
+    console.warn("Nie udało się zapisać profilu:", err);
+  }
+}
+
+export async function zapiszWpisyWagi() {
+  try {
+    await dbSet("meta", "wpisyWagi", mockWpisyWagi);
+  } catch (err) {
+    console.warn("Nie udało się zapisać wpisów wagi:", err);
+  }
+}
+
+export async function zapiszPR() {
+  try {
+    await dbSet("meta", "pr", mockPR);
+  } catch (err) {
+    console.warn("Nie udało się zapisać rekordów:", err);
+  }
+}
+
+export async function zapiszAchievementyWlasne() {
+  try {
+    await dbSet("meta", "achievementyWlasne", mockAchievementyWlasne);
+  } catch (err) {
+    console.warn("Nie udało się zapisać achievementów:", err);
+  }
+}
+
+export async function zapiszPlan() {
+  try {
+    await dbSet("meta", "plan", mockPlan);
+  } catch (err) {
+    console.warn("Nie udało się zapisać planu:", err);
+  }
+}
