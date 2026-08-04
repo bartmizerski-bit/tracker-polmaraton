@@ -7,6 +7,7 @@ function ostatniWpis() {
 
 function wykresBMI() {
   if (mockWpisyWagi.length < 2) return `<p class="brak-wykresu">Za mało wpisów na wykres BMI.</p>`;
+  if (!mockProfil.wzrost_cm) return `<p class="brak-wykresu">Uzupełnij wzrost, żeby zobaczyć wykres BMI.</p>`;
 
   const posortowane = [...mockWpisyWagi].sort((a, b) => (a.data > b.data ? 1 : -1));
   const wartosciBMI = posortowane.map((w) => obliczBMI(w.waga_kg, mockProfil.wzrost_cm));
@@ -36,7 +37,7 @@ function wykresBMI() {
 export function mount(container, wroc) {
   function render() {
     const ostatni = ostatniWpis();
-    const bmi = ostatni ? obliczBMI(ostatni.waga_kg, mockProfil.wzrost_cm) : null;
+    const bmi = ostatni && mockProfil.wzrost_cm ? obliczBMI(ostatni.waga_kg, mockProfil.wzrost_cm) : null;
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wroc">‹ Więcej</button>

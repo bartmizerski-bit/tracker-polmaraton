@@ -1,4 +1,4 @@
-import { mockProfil, mockPlan, mockWpisyWagi, zapiszProfil, zapiszWpisyWagi, zapiszPlan } from "../state.js";
+import { mockProfil, mockPlan, mockWpisyWagi, zapiszProfil, zapiszWpisyWagi, zapiszPlan, wyczyscWszystkieDane } from "../state.js";
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
@@ -123,7 +123,20 @@ export function mount(container, wroc) {
       </div>
 
       <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
+
+      <div class="sekcja-naglowek">Strefa niebezpieczna</div>
+      <button class="reset-btn" data-action="wyczysc">Wyczyść wszystkie dane</button>
+      <div id="reset-komunikat"></div>
     `;
+
+    container.querySelector("[data-action='wyczysc']").onclick = async () => {
+      const na_pewno = confirm(
+        "To usunie WSZYSTKO: checkboxy, km marszu, wagę, wzrost, rekordy, achievementy i zaimportowany plan. Nie da się cofnąć. Na pewno?"
+      );
+      if (!na_pewno) return;
+      await wyczyscWszystkieDane();
+      renderKrok1();
+    };
 
     container.querySelector("[data-action='wroc']").onclick = wroc;
     container.querySelector("[data-action='dalej']").onclick = () => {

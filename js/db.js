@@ -70,3 +70,14 @@ export async function dbGetAll(store) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+export async function dbClearAll() {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["meta", "dni"], "readwrite");
+    tx.objectStore("meta").clear();
+    tx.objectStore("dni").clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}

@@ -710,3 +710,17 @@ body {
   font-size: 0.85rem;
   margin-top: 0.5rem;
 }
+
+/* Strefa niebezpieczna — reset danych */
+.reset-btn {
+  background: transparent;
+  border: 1.5px solid var(--color-track-red);
+  border-radius: 12px;
+  color: var(--color-track-red);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.7rem;
+  cursor: pointer;
+  width: 100%;
+}
