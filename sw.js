@@ -1,7 +1,7 @@
 // Service worker — odpowiada za działanie apki offline.
 // Wersja cache'a: podbij ten numer przy każdej większej zmianie plików,
 // żeby przeglądarka pobrała świeżą wersję zamiast starej z pamięci.
-const CACHE_NAME = "po-co-mi-to-bylo-v4";
+const CACHE_NAME = "po-co-mi-to-bylo-v5";
 
 // Pliki "powłoki" apki — muszą działać nawet bez internetu.
 const APP_SHELL = [
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./js/app.js",
   "./js/state.js",
   "./js/db.js",
+  "./js/obliczenia.js",
   "./js/views/dzien.js",
   "./js/views/tydzien.js",
   "./js/views/statystyki.js",

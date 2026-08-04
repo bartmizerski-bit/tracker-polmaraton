@@ -1,19 +1,23 @@
 import { mockAchievementyAutomatyczne, mockAchievementyWlasne, zapiszAchievementyWlasne } from "../state.js";
+import { obliczOdblokowaneAchievementy } from "../obliczenia.js";
 
 export function mount(container, wroc) {
   function render() {
+    const odblokowane = obliczOdblokowaneAchievementy();
+
     const automatyczne = mockAchievementyAutomatyczne
-      .map(
-        (a) => `
-        <div class="ach-item ${a.odblokowany ? "odblokowany" : "zablokowany"}">
-          <div class="ach-znacznik">${a.odblokowany ? "✓" : "–"}</div>
+      .map((a) => {
+        const jestOdblokowany = Boolean(odblokowane[a.id]);
+        return `
+        <div class="ach-item ${jestOdblokowany ? "odblokowany" : "zablokowany"}">
+          <div class="ach-znacznik">${jestOdblokowany ? "✓" : "–"}</div>
           <div class="ach-tresc">
             <span class="ach-nazwa">${a.nazwa}</span>
             <span class="ach-opis">${a.opis}</span>
           </div>
         </div>
-      `
-      )
+      `;
+      })
       .join("");
 
     const wlasne = mockAchievementyWlasne.length
