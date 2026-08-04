@@ -191,6 +191,42 @@ export async function zapiszPlan() {
   }
 }
 
+// --- Backup: eksport/import całej bazy do pliku JSON ---
+export function eksportujDane() {
+  return {
+    wersja: 1,
+    eksportowano: new Date().toISOString(),
+    profil: mockProfil,
+    plan: mockPlan,
+    wpisyWagi: mockWpisyWagi,
+    pr: mockPR,
+    achievementyWlasne: mockAchievementyWlasne,
+    dni: mockRealizacja,
+  };
+}
+
+export async function importujDane(dane) {
+  if (!dane || typeof dane !== "object") {
+    throw new Error("To nie jest poprawny plik backupu.");
+  }
+
+  if (dane.profil) Object.assign(mockProfil, dane.profil);
+  if (dane.plan) Object.assign(mockPlan, dane.plan);
+  if (Array.isArray(dane.wpisyWagi)) mockWpisyWagi.splice(0, mockWpisyWagi.length, ...dane.wpisyWagi);
+  if (dane.pr) Object.assign(mockPR, dane.pr);
+  if (Array.isArray(dane.achievementyWlasne)) {
+    mockAchievementyWlasne.splice(0, mockAchievementyWlasne.length, ...dane.achievementyWlasne);
+  }
+  if (dane.dni) Object.assign(mockRealizacja, dane.dni);
+
+  await zapiszProfil();
+  await zapiszPlan();
+  await zapiszWpisyWagi();
+  await zapiszPR();
+  await zapiszAchievementyWlasne();
+  await Promise.all(Object.keys(mockRealizacja).map((klucz) => zapiszRealizacje(klucz)));
+}
+
 // --- Pełny reset (kasuje IndexedDB i czyści dane w pamięci) ---
 export async function wyczyscWszystkieDane() {
   try {

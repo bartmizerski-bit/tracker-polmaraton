@@ -1,4 +1,14 @@
-import { mockProfil, mockPlan, mockWpisyWagi, zapiszProfil, zapiszWpisyWagi, zapiszPlan, wyczyscWszystkieDane } from "../state.js";
+import {
+  mockProfil,
+  mockPlan,
+  mockWpisyWagi,
+  zapiszProfil,
+  zapiszWpisyWagi,
+  zapiszPlan,
+  wyczyscWszystkieDane,
+  eksportujDane,
+  importujDane,
+} from "../state.js";
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
@@ -47,6 +57,48 @@ ${numer}. NIE planuj km marszu ani niczego związanego z dietą — poza zakrese
 
 export function mount(container, wroc) {
   let krok = 1;
+
+  async function eksportuj() {
+    const dane = eksportujDane();
+    const tekst = JSON.stringify(dane, null, 2);
+    const nazwaPliku = `backup-po-co-mi-to-bylo-${new Date().toISOString().slice(0, 10)}.json`;
+    const plik = new File([tekst], nazwaPliku, { type: "application/json" });
+
+    if (navigator.canShare && navigator.canShare({ files: [plik] })) {
+      try {
+        await navigator.share({ files: [plik], title: "Backup danych treningowych" });
+        return;
+      } catch (err) {
+        // user anulował albo udostępnianie się nie udało — spadamy do zwykłego pobrania
+      }
+    }
+
+    const url = URL.createObjectURL(plik);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nazwaPliku;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function obslugaImportu(event) {
+    const plik = event.target.files[0];
+    if (!plik) return;
+
+    try {
+      const tekst = await plik.text();
+      const dane = JSON.parse(tekst);
+      await importujDane(dane);
+      renderKrok1();
+      container.querySelector("#backup-komunikat").innerHTML =
+        `<p class="komunikat-sukces">Backup wczytany. Sprawdź pozostałe zakładki.</p>`;
+    } catch (err) {
+      const komunikat = container.querySelector("#backup-komunikat");
+      if (komunikat) komunikat.innerHTML = `<p class="komunikat-blad">Nie udało się wczytać pliku: ${err.message}</p>`;
+    }
+  }
 
   function renderKrok1() {
     const kat = mockProfil.kategorie_wybrane;
@@ -124,10 +176,23 @@ export function mount(container, wroc) {
 
       <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
 
+      <div class="sekcja-naglowek">Kopia zapasowa</div>
+      <p class="opis-sekcji">Dane siedzą tylko na tym urządzeniu. Eksportuj je od czasu do czasu, żeby nie stracić historii przy zmianie telefonu albo wyczyszczeniu przeglądarki.</p>
+      <button class="dodaj-btn" data-action="eksportuj">Eksportuj dane</button>
+      <button class="dodaj-btn" data-action="importuj-wybierz">Importuj dane z pliku</button>
+      <input type="file" accept="application/json" id="import-plik" style="display:none" />
+      <div id="backup-komunikat"></div>
+
       <div class="sekcja-naglowek">Strefa niebezpieczna</div>
       <button class="reset-btn" data-action="wyczysc">Wyczyść wszystkie dane</button>
       <div id="reset-komunikat"></div>
     `;
+
+    container.querySelector("[data-action='eksportuj']").onclick = eksportuj;
+    container.querySelector("[data-action='importuj-wybierz']").onclick = () => {
+      container.querySelector("#import-plik").click();
+    };
+    container.querySelector("#import-plik").onchange = obslugaImportu;
 
     container.querySelector("[data-action='wyczysc']").onclick = async () => {
       const na_pewno = confirm(

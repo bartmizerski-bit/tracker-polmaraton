@@ -6,7 +6,35 @@ import {
   getPlanDay,
   getRealizacja,
   zapiszRealizacje,
+  mockWpisyWagi,
 } from "../state.js";
+
+const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu
+
+function ostatniaWaga() {
+  if (!mockWpisyWagi.length) return null;
+  const posortowane = [...mockWpisyWagi].sort((a, b) => (a.data > b.data ? 1 : -1));
+  return posortowane[posortowane.length - 1].waga_kg;
+}
+
+function kalorieMarszu(km) {
+  const waga = ostatniaWaga();
+  if (!waga || !km || isNaN(km)) return 0;
+  return Math.round(km * waga * KCAL_NA_KG_NA_KM);
+}
+
+function kalorieDnia(planDay, realizacja) {
+  let suma = 0;
+  ["bieganie", "drazki", "dom"].forEach((kat) => {
+    const dane = planDay[kat];
+    const stan = realizacja.kategorie?.[kat];
+    if (dane?.kalorie && (stan === "zrealizowany" || stan === "czesciowo")) {
+      suma += dane.kalorie;
+    }
+  });
+  suma += kalorieMarszu(parseFloat(realizacja.km_marsz.wartosc));
+  return suma;
+}
 
 function formatujDate(dateKey) {
   const d = new Date(dateKey);
@@ -38,14 +66,18 @@ function renderujKafelek(kategoria, planDay, realizacja) {
         <div class="tile-meta">
           <span>Tempo: <strong>${dane.tempo}</strong></span>
           <span>${dane.strefa_tetna}: <strong>${dane.zakres_tetna}</strong></span>
+          ${dane.kalorie ? `<span>Kalorie: <strong>${dane.kalorie} kcal</strong></span>` : ""}
         </div>
       </div>
     `;
   } else if (kategoria === "drazki" || kategoria === "dom") {
     const pozycje = dane.cwiczenia
-      .map((c) => `<li><span>${c.nazwa}</span><span class="ilosc">${c.ilosc}</span></li>`)
+      .map((c) => `<li><span class="nazwa-cwiczenia">${c.nazwa}</span><span class="ilosc">${c.ilosc}</span></li>`)
       .join("");
-    tresc = `<ul class="exercise-list">${pozycje}</ul>`;
+    tresc = `
+      <ul class="exercise-list">${pozycje}</ul>
+      ${dane.kalorie ? `<p class="kalorie-info">${dane.kalorie} kcal</p>` : ""}
+    `;
   }
   // sporty_walki / silownia: tylko checkbox, bez treści — tresc zostaje puste
 
@@ -90,6 +122,13 @@ export function mount(container, dateKey) {
       </div>
     `;
 
+    const kalorieCard = `
+      <div class="kalorie-dzien">
+        <span class="kalorie-wartosc">${kalorieDnia(planDay, realizacja)}</span>
+        <span class="kalorie-etykieta">kcal dziś</span>
+      </div>
+    `;
+
     let glownaTresc;
     if (realizacja.stan_dnia === "normalny") {
       const kafelki = Object.keys(CATEGORY_LABELS)
@@ -113,6 +152,7 @@ export function mount(container, dateKey) {
       </div>
       ${daystateButtons}
       ${fixedRow}
+      ${kalorieCard}
       ${glownaTresc}
     `;
   }
