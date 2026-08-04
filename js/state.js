@@ -147,3 +147,83 @@ export function getRealizacja(dateKey) {
   }
   return mockRealizacja[dateKey];
 }
+
+// --- Profil usera (mock) ---
+export const mockProfil = {
+  wzrost_cm: 178,
+  wiek: 29,
+  kategorie_wybrane: ["bieganie", "drazki", "dom", "sporty_walki"],
+  data_startu_planu: toKey(new Date()),
+  data_polmaratonu: toKey(addDays(new Date(), 90)),
+};
+
+// --- Wpisy wagi (mock, do BMI) ---
+export const mockWpisyWagi = [
+  { data: kluczDniTemu(30), waga_kg: 84.1 },
+  { data: kluczDniTemu(23), waga_kg: 83.4 },
+  { data: kluczDniTemu(16), waga_kg: 82.9 },
+  { data: kluczDniTemu(9), waga_kg: 82.3 },
+  { data: kluczDniTemu(2), waga_kg: 81.9 },
+];
+
+export function obliczBMI(wagaKg, wzrostCm) {
+  const wzrostM = wzrostCm / 100;
+  return wagaKg / (wzrostM * wzrostM);
+}
+
+// --- Achievementy (mock) ---
+export const mockAchievementyAutomatyczne = [
+  { id: "streak_3", nazwa: "Rozgrzewka się skończyła", opis: "3 dni z rzędu", odblokowany: true },
+  { id: "streak_7", nazwa: "Tydzień bez wymówek", opis: "7 dni z rzędu", odblokowany: true },
+  { id: "streak_14", nazwa: "Dwa tygodnie, zero dram", opis: "14 dni z rzędu", odblokowany: false },
+  { id: "streak_30", nazwa: "Miesiąc bez wymówek", opis: "30 dni z rzędu", odblokowany: false },
+  { id: "streak_60", nazwa: "Kolana już przywykły", opis: "60 dni z rzędu", odblokowany: false },
+  { id: "streak_100", nazwa: "To już nawyk, nie wyczyn", opis: "100 dni z rzędu", odblokowany: false },
+  { id: "km_50", nazwa: "Buty już to czują", opis: "50 km marszu sumarycznie", odblokowany: true },
+  { id: "km_100", nazwa: "Można by dojść do sąsiedniego miasta", opis: "100 km marszu sumarycznie", odblokowany: false },
+  { id: "km_250", nazwa: "Chodząca ambicja", opis: "250 km marszu sumarycznie", odblokowany: false },
+  { id: "sesje_bieganie_10", nazwa: "Dziesięć razy w butach do biegania", opis: "10 sesji biegowych", odblokowany: true },
+  { id: "sesje_drazki_10", nazwa: "Dłonie już znają drążek", opis: "10 sesji na drążkach", odblokowany: false },
+  { id: "dzien_startu", nazwa: "Największy entuzjazm tego cyklu", opis: "Dzień 1 planu", odblokowany: true },
+  { id: "powrot_po_przerwie", nazwa: "Wróciłeś. Kolana też się zdziwiły", opis: "Powrót zaraz po dniu przerwy", odblokowany: true },
+  { id: "miesiac_bez_lenia", nazwa: "Ani jednego lenia", opis: "Miesiąc bez dnia oznaczonego jako leń", odblokowany: false },
+  { id: "dzien_wyscigu", nazwa: "Dzień wyścigu", opis: "Dzień półmaratonu", odblokowany: false },
+];
+
+export const mockAchievementyWlasne = [
+  { id: "custom_1", nazwa: "Pierwszy bieg bez zatrzymania", opis: "", data: kluczDniTemu(12) },
+];
+
+// --- Rekordy personalne (mock) ---
+export const PR_LABELS = {
+  czas_1km: "Czas na 1 km",
+  czas_5km: "Czas na 5 km",
+  podciagniecia_neutralne: "Podciągnięcia (chwyt neutralny)",
+};
+
+export const mockPR = {
+  czas_1km: { kierunek: "malejaco", wpisy: [
+    { data: kluczDniTemu(20), wartosc: "4:48" },
+    { data: kluczDniTemu(10), wartosc: "4:40" },
+    { data: kluczDniTemu(2), wartosc: "4:32" },
+  ]},
+  czas_5km: { kierunek: "malejaco", wpisy: [
+    { data: kluczDniTemu(15), wartosc: "26:10" },
+    { data: kluczDniTemu(3), wartosc: "25:20" },
+  ]},
+  podciagniecia_neutralne: { kierunek: "rosnaco", wpisy: [
+    { data: kluczDniTemu(18), wartosc: "6" },
+    { data: kluczDniTemu(5), wartosc: "8" },
+  ]},
+};
+
+export function parsujCzasDoSekund(str) {
+  const [m, s] = str.split(":").map(Number);
+  return m * 60 + s;
+}
+
+export function formatujSekundyDoCzasu(sek) {
+  const m = Math.floor(sek / 60);
+  const s = Math.round(sek % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}

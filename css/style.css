@@ -458,3 +458,255 @@ body {
   font-size: 0.7rem;
   color: var(--color-text-muted);
 }
+
+/* Przycisk cofnij w podwidokach */
+.cofnij-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* Menu "Więcej" */
+.menu-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.menu-pozycja {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-ink-light);
+  border: none;
+  border-radius: 14px;
+  padding: 1rem;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-strzalka {
+  color: var(--color-text-muted);
+}
+
+/* Achievementy */
+.ach-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ach-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--color-ink-light);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+}
+
+.ach-item.zablokowany {
+  opacity: 0.5;
+}
+
+.ach-znacznik {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.ach-item.odblokowany .ach-znacznik {
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+.ach-item.zablokowany .ach-znacznik {
+  background: transparent;
+  border: 2px solid var(--color-text-muted);
+  color: var(--color-text-muted);
+}
+
+.ach-tresc {
+  display: flex;
+  flex-direction: column;
+}
+
+.ach-nazwa {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ach-opis {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.pusta-lista {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Przyciski dodawania + mini formularze */
+.dodaj-btn {
+  background: var(--color-ink-light);
+  border: 1.5px dashed var(--color-text-muted);
+  border-radius: 12px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.7rem;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.dodaj-btn.maly {
+  padding: 0.4rem;
+  font-size: 0.78rem;
+  width: 100%;
+}
+
+.mini-formularz {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.mini-formularz input {
+  flex: 1;
+  background: var(--color-ink);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  padding: 0.4rem 0.6rem;
+  min-width: 0;
+}
+
+.mini-formularz button {
+  background: var(--color-lime);
+  border: none;
+  border-radius: 8px;
+  color: var(--color-ink);
+  font-weight: 700;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+/* Rekordy personalne */
+.pr-card {
+  background: var(--color-ink-light);
+  border-radius: 14px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pr-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.pr-nazwa {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.pr-najlepszy {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--color-lime);
+}
+
+.pr-wykres {
+  width: 100%;
+  height: 56px;
+}
+
+.pr-wykres polyline {
+  stroke: var(--color-lime);
+}
+
+.brak-wykresu {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Konfiguracja */
+.kat-checkboxy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.kat-wiersz {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--color-ink-light);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.kat-wiersz input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-lime);
+}
+
+.ai-instrukcja {
+  background: var(--color-ink);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-muted);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.import-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--color-ink-light);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 12px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 0.7rem;
+  resize: vertical;
+}
+
+.komunikat-sukces {
+  color: var(--color-lime);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.komunikat-blad {
+  color: var(--color-track-red);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
