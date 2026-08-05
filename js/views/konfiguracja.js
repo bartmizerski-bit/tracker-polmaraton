@@ -22,16 +22,31 @@ function naprawCudzyslowy(tekst) {
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
-Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
+Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego nagłówka typu "Oto Twój plan:", żadnego podsumowania na końcu, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json i wczytana przez aplikację — jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy i import się nie powiedzie.
 
 Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
 
 Zasady:
 1. Struktura: { "meta": {...}, "dni": {...} }.
-2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy. Fazy MUSZĄ pokrywać cały zakres dat bez dziur i bez nakładania się.
-3. Dla każdego dnia dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
+2. Klucze w "dni" to KONKRETNE DATY KALENDARZOWE w formacie "YYYY-MM-DD" (np. "${dataStartu}") — jeden klucz na jeden realny dzień. NIGDY nie używaj nazw dni tygodnia (nie "poniedziałek", "wtorek" itd.) ani jednego "szablonu tygodnia" opisanego raz i mającego się powtarzać. Jeśli treść w kilku dniach się powtarza (np. te same ćwiczenia co tydzień w ten sam dzień tygodnia), i tak każde takie wystąpienie dostaje osobny klucz z jego własną datą.
 
-  let numer = 4;
+   Przykład POPRAWNEGO fragmentu:
+   "dni": {
+     "${dataStartu}": { "bieganie": { ... } },
+     "2026-08-11": { "dom": { ... } }
+   }
+
+   Przykład BŁĘDNEGO fragmentu (NIE rób tak):
+   "dni": {
+     "poniedziałek": { ... },
+     "wtorek": { ... }
+   }
+   To jest szablon tygodniowy zamiast konkretnych dat — aplikacja tego nie obsłuży.
+
+3. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy. Fazy MUSZĄ pokrywać cały zakres dat bez dziur i bez nakładania się.
+4. Dla każdego dnia dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
+
+  let numer = 5;
   if (kategorie.includes("bieganie")) {
     tekst += `
 
@@ -60,7 +75,11 @@ ${numer}. Dla "${walkiLubSilownia}": wyłącznie wartość true w dniach wystąp
   }
   tekst += `
 
-${numer}. NIE planuj km marszu ani niczego związanego z dietą — poza zakresem tego pliku.`;
+${numer}. NIE planuj km marszu ani niczego związanego z dietą — poza zakresem tego pliku.
+
+Zanim wyślesz odpowiedź, sprawdź samodzielnie:
+- Czy zwracasz WYŁĄCZNIE surowy JSON, bez żadnego tekstu, nagłówka, podsumowania czy code fence wokół niego?
+- Czy każdy klucz w "dni" to realna data w formacie YYYY-MM-DD z zakresu ${dataStartu}–${dataPolmaratonu}, a nie nazwa dnia tygodnia ani szablon?`;
 
   return tekst;
 }
@@ -139,7 +158,20 @@ export function mount(container, wroc) {
 
       Object.assign(mockPlan, dane.dni);
       zapiszPlan();
-      komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${noweKlucze.length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
+
+      if (noweKlucze.length) {
+        const kluczeSortowane = [...noweKlucze].sort();
+        const zakres =
+          kluczeSortowane[0] === kluczeSortowane[kluczeSortowane.length - 1]
+            ? kluczeSortowane[0]
+            : `${kluczeSortowane[0]} – ${kluczeSortowane[kluczeSortowane.length - 1]}`;
+        komunikat.innerHTML = `
+          <p class="komunikat-sukces">Zaimportowano ${kluczeSortowane.length} dni planu (${zakres}). Sprawdź zakładkę Dziś/Tydzień.</p>
+          <p class="komunikat-sukces">Daty: ${kluczeSortowane.join(", ")}</p>
+        `;
+      } else {
+        komunikat.innerHTML = `<p class="komunikat-sukces">Plik wczytany, ale nie zawierał żadnych dni.</p>`;
+      }
     } catch (err) {
       komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny plik JSON zgodny ze schematem: ${err.message}</p>`;
     }
