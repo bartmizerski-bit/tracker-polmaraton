@@ -48,7 +48,7 @@ export function getRealizacja(dateKey) {
   if (!mockRealizacja[dateKey]) {
     mockRealizacja[dateKey] = {
       stan_dnia: "normalny",
-      km_marsz: { wartosc: "", potwierdzone: false },
+      km_marsz: { wartosc: "" },
       trzymanie_michy: false,
       kategorie: {},
     };

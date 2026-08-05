@@ -124,7 +124,7 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Checkbox binarny (km potwierdzenie, trzymanie michy) */
+/* Checkbox binarny (trzymanie michy) */
 .checkbox-binary {
   width: 22px;
   height: 22px;
@@ -249,10 +249,15 @@ body {
   white-space: nowrap;
 }
 
-.kalorie-info {
-  margin: 0.3rem 0 0;
-  font-size: 0.78rem;
+/* Wiersz kalorii — wspólny dla wszystkich kategorii kafelka (bieganie/drążki/dom) */
+.tile-kcal {
+  font-size: 0.8rem;
   color: var(--color-text-muted);
+}
+
+.tile-kcal strong {
+  color: var(--color-lime);
+  font-weight: 600;
 }
 
 .kalorie-dzien {

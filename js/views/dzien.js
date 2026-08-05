@@ -66,7 +66,6 @@ function renderujKafelek(kategoria, planDay, realizacja) {
         <div class="tile-meta">
           <span>Tempo: <strong>${dane.tempo}</strong></span>
           <span>${dane.strefa_tetna}: <strong>${dane.zakres_tetna}</strong></span>
-          ${dane.kalorie ? `<span>Kalorie: <strong>${dane.kalorie} kcal</strong></span>` : ""}
         </div>
       </div>
     `;
@@ -74,12 +73,12 @@ function renderujKafelek(kategoria, planDay, realizacja) {
     const pozycje = dane.cwiczenia
       .map((c) => `<li><span class="nazwa-cwiczenia">${c.nazwa}</span><span class="ilosc">${c.ilosc}</span></li>`)
       .join("");
-    tresc = `
-      <ul class="exercise-list">${pozycje}</ul>
-      ${dane.kalorie ? `<p class="kalorie-info">${dane.kalorie} kcal</p>` : ""}
-    `;
+    tresc = `<ul class="exercise-list">${pozycje}</ul>`;
   }
   // sporty_walki / silownia: tylko checkbox, bez treści — tresc zostaje puste
+
+  // Wspólny wiersz kalorii na dole kafelka — ten sam wygląd niezależnie od kategorii.
+  const kcalRow = dane.kalorie ? `<div class="tile-kcal">Kalorie: <strong>${dane.kalorie} kcal</strong></div>` : "";
 
   return `
     <div class="tile">
@@ -88,6 +87,7 @@ function renderujKafelek(kategoria, planDay, realizacja) {
         <span class="tile-title">${CATEGORY_LABELS[kategoria]}</span>
       </div>
       ${tresc}
+      ${kcalRow}
     </div>
   `;
 }
@@ -110,8 +110,6 @@ export function mount(container, dateKey) {
           <label for="km-input-${dateKey}">Marsz</label>
           <input id="km-input-${dateKey}" class="km-input" type="number" step="0.1" min="0"
                  placeholder="km" value="${realizacja.km_marsz.wartosc}" data-field="km-marsz" />
-          <button class="checkbox-binary ${realizacja.km_marsz.potwierdzone ? "checked" : ""}"
-                  data-action="km-potwierdzenie" aria-label="Potwierdź marsz"></button>
         </div>
         <div class="fixed-divider"></div>
         <div class="fixed-item">
@@ -165,8 +163,6 @@ export function mount(container, dateKey) {
     if (action === "tristate") {
       const kat = el.dataset.category;
       realizacja.kategorie[kat] = cycleTristate(realizacja.kategorie[kat] ?? "niezrealizowany");
-    } else if (action === "km-potwierdzenie") {
-      realizacja.km_marsz.potwierdzone = !realizacja.km_marsz.potwierdzone;
     } else if (action === "trzymanie-michy") {
       realizacja.trzymanie_michy = !realizacja.trzymanie_michy;
     } else if (action === "day-state") {

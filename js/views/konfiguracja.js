@@ -121,9 +121,25 @@ export function mount(container, wroc) {
       if (!dane.dni || typeof dane.dni !== "object") {
         throw new Error("Brak sekcji 'dni' w pliku.");
       }
+
+      const noweKlucze = Object.keys(dane.dni);
+
+      // Reimport ma ZASTĘPOWAĆ resztę planu od pierwszego dnia nowego pliku w przód —
+      // nie tylko dopisywać nowe dni. Object.assign sam z siebie nadpisuje wyłącznie
+      // klucze, które istnieją w nowym pliku, więc dzień, który w nowym planie nie ma
+      // już żadnej treści (np. bo trening przeniesiono na inny dzień), zostawałby
+      // z treścią starego planu. Dlatego najpierw czyścimy cały zakres dat od
+      // najwcześniejszego dnia nowego importu w przód, dopiero potem wgrywamy nową treść.
+      if (noweKlucze.length) {
+        const odDaty = noweKlucze.reduce((min, k) => (k < min ? k : min), noweKlucze[0]);
+        Object.keys(mockPlan).forEach((klucz) => {
+          if (klucz >= odDaty) delete mockPlan[klucz];
+        });
+      }
+
       Object.assign(mockPlan, dane.dni);
       zapiszPlan();
-      komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${Object.keys(dane.dni).length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
+      komunikat.innerHTML = `<p class="komunikat-sukces">Zaimportowano ${noweKlucze.length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
     } catch (err) {
       komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny plik JSON zgodny ze schematem: ${err.message}</p>`;
     }
