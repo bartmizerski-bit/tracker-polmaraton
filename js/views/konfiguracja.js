@@ -8,6 +8,8 @@ import {
   wyczyscWszystkieDane,
   eksportujDane,
   importujDane,
+  toKey,
+  addDays,
 } from "../state.js";
 
 // Telefony (zwłaszcza iPhone przy wpisywaniu/wklejaniu przez niektóre pola)
@@ -20,68 +22,165 @@ function naprawCudzyslowy(tekst) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 }
 
-function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
-  let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
-Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego nagłówka typu "Oto Twój plan:", żadnego podsumowania na końcu, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json i wczytana przez aplikację — jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy i import się nie powiedzie.
+// AI notorycznie dokleja "Oto Twój plan:" na początku i ```json dookoła.
+// Zamiast prosić, żeby tego nie robiło — po prostu bierzemy wszystko
+// od pierwszego { do ostatniego }.
+function wytnijJson(tekst) {
+  const start = tekst.indexOf("{");
+  const koniec = tekst.lastIndexOf("}");
+  if (start === -1 || koniec === -1 || koniec < start) return tekst;
+  return tekst.slice(start, koniec + 1);
+}
 
-Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
+// Przecinek przed zamykającym nawiasem — drugi najczęstszy błąd modeli.
+function usunWiszacePrzecinki(tekst) {
+  return tekst.replace(/,(\s*[}\]])/g, "$1");
+}
 
-Zasady:
-1. Struktura: { "meta": {...}, "dni": {...} }.
-2. Klucze w "dni" to KONKRETNE DATY KALENDARZOWE w formacie "YYYY-MM-DD" (np. "${dataStartu}") — jeden klucz na jeden realny dzień. NIGDY nie używaj nazw dni tygodnia (nie "poniedziałek", "wtorek" itd.) ani jednego "szablonu tygodnia" opisanego raz i mającego się powtarzać. Jeśli treść w kilku dniach się powtarza (np. te same ćwiczenia co tydzień w ten sam dzień tygodnia), i tak każde takie wystąpienie dostaje osobny klucz z jego własną datą.
+function przygotujDoParsowania(tekst) {
+  return usunWiszacePrzecinki(wytnijJson(naprawCudzyslowy(tekst)));
+}
 
-   Przykład POPRAWNEGO fragmentu:
-   "dni": {
-     "${dataStartu}": { "bieganie": { ... } },
-     "2026-08-11": { "dom": { ... } }
-   }
+function escapeHtml(tekst) {
+  return tekst.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
-   Przykład BŁĘDNEGO fragmentu (NIE rób tak):
-   "dni": {
-     "poniedziałek": { ... },
-     "wtorek": { ... }
-   }
-   To jest szablon tygodniowy zamiast konkretnych dat — aplikacja tego nie obsłuży.
+// --- Okno importu: zawsze 28 dni, licząc od miejsca, w którym kończy się plan ---
 
-3. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy. Fazy MUSZĄ pokrywać cały zakres dat bez dziur i bez nakładania się.
-4. Dla każdego dnia dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
+const DNI_W_OKNIE = 28;
 
-  let numer = 5;
+function oknoImportu() {
+  const klucze = Object.keys(mockPlan).sort();
+  const dzis = toKey(new Date());
+
+  let od;
+  if (klucze.length) {
+    const poOstatnim = toKey(addDays(new Date(klucze[klucze.length - 1]), 1));
+    od = poOstatnim < dzis ? dzis : poOstatnim; // plan się zestarzał → start od dziś
+  } else {
+    od = mockProfil.data_startu_planu || dzis;
+  }
+
+  const doDnia = toKey(addDays(new Date(od), DNI_W_OKNIE - 1));
+  return { od, doDnia, ostatniWPlanie: klucze.length ? klucze[klucze.length - 1] : null };
+}
+
+function listaDatOkna(od) {
+  return [...Array(DNI_W_OKNIE)].map((_, i) => toKey(addDays(new Date(od), i)));
+}
+
+// --- Treść instrukcji dla AI ---
+
+function generujInstrukcje(kategorie, od, doDnia) {
+  const listaKategorii = kategorie.join(", ");
+
+  // Schemat pokazuje tylko te kategorie, które user faktycznie wybrał.
+  const przykladoweDni = [];
+
+  const dzienA = [];
   if (kategorie.includes("bieganie")) {
-    tekst += `
-
-${numer}. Dla "bieganie": opis treningu, tempo, strefa tętna, zakres tętna w bpm, szacowane kalorie.
-   Format tempo: ZAWSZE "M:SS-M:SS min/km". Format zakres_tetna: ZAWSZE "NNN-NNN bpm".`;
-    numer++;
+    dzienA.push(`    "bieganie": {
+      "opis": "Interwały 2 min bieg / 3 min marsz, 6 powtórzeń",
+      "tempo": "5:30-6:00 min/km",
+      "strefa_tetna": "Strefa 2",
+      "zakres_tetna": "128-142 bpm",
+      "kalorie": 320
+    }`);
   }
   if (kategorie.includes("drazki")) {
-    tekst += `
-
-${numer}. Dla "drazki": lista ćwiczeń jako tablica { "nazwa", "ilosc" } + szacowane kalorie.`;
-    numer++;
-  }
-  if (kategorie.includes("dom")) {
-    tekst += `
-
-${numer}. Dla "dom": analogicznie jak drążki.`;
-    numer++;
+    dzienA.push(`    "drazki": {
+      "cwiczenia": [
+        { "nazwa": "Podciąganie nachwytem", "ilosc": "4x6" },
+        { "nazwa": "Zwis aktywny", "ilosc": "3x30s" }
+      ],
+      "kalorie": 180
+    }`);
   }
   const walkiLubSilownia = kategorie.find((k) => k === "sporty_walki" || k === "silownia");
   if (walkiLubSilownia) {
-    tekst += `
-
-${numer}. Dla "${walkiLubSilownia}": wyłącznie wartość true w dniach wystąpienia — BEZ opisu, BEZ kalorii.`;
-    numer++;
+    dzienA.push(`    "${walkiLubSilownia}": true`);
   }
-  tekst += `
+  przykladoweDni.push(`  "${od}": {\n${dzienA.join(",\n")}\n  }`);
 
-${numer}. NIE planuj km marszu ani niczego związanego z dietą — poza zakresem tego pliku.
+  if (kategorie.includes("dom")) {
+    przykladoweDni.push(`  "${toKey(addDays(new Date(od), 1))}": {
+    "dom": {
+      "cwiczenia": [
+        { "nazwa": "Pompki", "ilosc": "4x15" },
+        { "nazwa": "Przysiady", "ilosc": "4x20" }
+      ],
+      "kalorie": 210
+    }
+  }`);
+  }
+  przykladoweDni.push(`  "${toKey(addDays(new Date(od), 2))}": {}`);
 
-Zanim wyślesz odpowiedź, sprawdź samodzielnie:
-- Czy zwracasz WYŁĄCZNIE surowy JSON, bez żadnego tekstu, nagłówka, podsumowania czy code fence wokół niego?
-- Czy każdy klucz w "dni" to realna data w formacie YYYY-MM-DD z zakresu ${dataStartu}–${dataPolmaratonu}, a nie nazwa dnia tygodnia ani szablon?`;
+  const schemat = `{\n  "dni": {\n${przykladoweDni.join(",\n")}\n  }\n}`;
 
-  return tekst;
+  // Opis pól — tylko dla wybranych kategorii.
+  const pola = [];
+  if (kategorie.includes("bieganie")) {
+    pola.push(`"bieganie" — obiekt z pięcioma polami, wszystkie obowiązkowe:
+   "opis"          string, konkretna treść treningu
+   "tempo"         string, ZAWSZE dokładnie w formacie "M:SS-M:SS min/km"
+   "strefa_tetna"  string, ZAWSZE dokładnie "Strefa N", gdzie N to cyfra 1-5
+   "zakres_tetna"  string, ZAWSZE dokładnie w formacie "NNN-NNN bpm"
+   "kalorie"       LICZBA, bez cudzysłowów, bez słowa "kcal" (poprawnie: 320, błędnie: "320 kcal")`);
+  }
+  if (kategorie.includes("drazki")) {
+    pola.push(`"drazki" — obiekt z dwoma polami:
+   "cwiczenia"     tablica obiektów { "nazwa": string, "ilosc": string }
+                   "ilosc" to ZAWSZE string, nawet gdy to sama liczba: "4x6", "3x30s", "10"
+   "kalorie"       LICZBA`);
+  }
+  if (kategorie.includes("dom")) {
+    pola.push(`"dom" — dokładnie taka sama struktura jak "drazki": "cwiczenia" + "kalorie".`);
+  }
+  if (walkiLubSilownia) {
+    pola.push(`"${walkiLubSilownia}" — wartość to dokładnie true (wartość logiczna, NIE "true" w cudzysłowach).
+   Bez opisu, bez ćwiczeń, bez kalorii. Sam fakt, że tego dnia trening jest.`);
+  }
+
+  return `Zamieniasz nasz gotowy plan treningowy na plik JSON dla mojej aplikacji.
+
+To zadanie techniczne, nie planistyczne. NIE układasz planu od nowa, NIE zmieniasz jego treści, NIE dodajesz nic od siebie — przepisujesz to, co już wspólnie ustaliliśmy, do formatu poniżej. Jeśli czegoś w naszym planie brakuje (np. tętna dla danego biegu), uzupełnij to sensownie, ale nie przebudowuj planu.
+
+ZAKRES: dokładnie dni od ${od} do ${doDnia}. To ${DNI_W_OKNIE} dni. Ani jednego mniej, ani jednego więcej. Nie wychodź poza ten zakres, nawet jeśli plan obejmuje dłuższy okres — resztę wygeneruję osobno.
+
+KATEGORIE: ${listaKategorii}. Żadnych innych kluczy kategorii.
+
+FORMA ODPOWIEDZI: wyłącznie JSON. Bez wstępu, bez komentarza na końcu, bez znaczników \`\`\`json. Twoja odpowiedź w całości trafia prosto do pliku .json — pierwszy znak to {, ostatni to }.
+
+SCHEMAT — skopiuj tę strukturę dokładnie:
+
+${schemat}
+
+ZASADY:
+
+1. Najwyższy poziom to obiekt z jednym kluczem: "dni". Nic więcej — bez "meta", bez "fazy", bez "plan".
+2. Wewnątrz "dni" kluczem jest data w formacie "RRRR-MM-DD". Muszą wystąpić WSZYSTKIE ${DNI_W_OKNIE} dni z zakresu, po kolei, bez luk.
+3. Dzień bez żadnego treningu to pusty obiekt: {}. Nie pomijaj takiego dnia i nie wpisuj w nim "odpoczynek".
+4. W danym dniu umieszczaj TYLKO te kategorie, które faktycznie tego dnia występują. Pozostałe po prostu pomiń.
+5. Nazwy kluczy kategorii zapisuj dokładnie tak, jak w schemacie — małymi literami, bez polskich znaków, bez spacji (${listaKategorii}).
+
+POLA:
+
+${pola.map((p, i) => `${i + 1}. ${p}`).join("\n\n")}
+
+CZEGO NIE ROBIĆ:
+
+- Nie dodawaj pól spoza schematu (żadnych "uwagi", "notatki", "dzien_tygodnia", "faza").
+- Nie skracaj odpowiedzi. Żadnych "...", "// pozostałe dni analogicznie", "(tu powtórz schemat)". Każdy z ${DNI_W_OKNIE} dni wypisany w całości.
+- Nie planuj km marszu ani niczego związanego z dietą — to jest poza zakresem tego pliku.
+- Nie owijaj odpowiedzi w markdown.
+
+ZANIM WYŚLESZ, SPRAWDŹ:
+
+1. Pierwszy znak odpowiedzi to {, ostatni to }.
+2. W "dni" jest dokładnie ${DNI_W_OKNIE} kluczy: od "${od}" do "${doDnia}", bez ani jednej brakującej daty.
+3. Nigdzie nie ma przecinka bezpośrednio przed } ani przed ].
+4. Każde "kalorie" to liczba, nie tekst.
+5. Użyte są wyłącznie klucze kategorii z listy: ${listaKategorii}.`;
 }
 
 export function mount(container, wroc) {
@@ -129,51 +228,41 @@ export function mount(container, wroc) {
     }
   }
 
-  async function obslugaImportuPlanu(event) {
-    const plik = event.target.files[0];
-    if (!plik) return;
+  // Wspólna ścieżka dla importu planu z pliku i z wklejonego tekstu.
+  function przetworzPlan(surowyTekst, oczekiwaneOd) {
+    const dane = JSON.parse(przygotujDoParsowania(surowyTekst));
+    if (!dane.dni || typeof dane.dni !== "object") {
+      throw new Error("Brak sekcji 'dni'.");
+    }
+
+    const klucze = Object.keys(dane.dni);
+    const zleFormaty = klucze.filter((k) => !/^\d{4}-\d{2}-\d{2}$/.test(k));
+    if (zleFormaty.length) {
+      throw new Error(`Klucze dni nie są datami RRRR-MM-DD (np. "${zleFormaty[0]}").`);
+    }
+
+    Object.assign(mockPlan, dane.dni);
+    zapiszPlan();
+
+    // Ostrzeżenie, a nie błąd — plan i tak się zapisał.
+    const oczekiwane = listaDatOkna(oczekiwaneOd);
+    const brakujace = oczekiwane.filter((d) => !(d in dane.dni));
+    return { ile: klucze.length, brakujace };
+  }
+
+  function pokazWynikImportu(wynik) {
     const komunikat = container.querySelector("#import-komunikat");
+    let html = `<p class="komunikat-sukces">Zaimportowano ${wynik.ile} dni planu.</p>`;
+    if (wynik.brakujace.length) {
+      html += `<p class="komunikat-blad">Uwaga: brakuje ${wynik.brakujace.length} dni z oczekiwanego zakresu (pierwszy: ${wynik.brakujace[0]}). AI prawdopodobnie urwało odpowiedź — poproś o brakujące dni i zaimportuj je ponownie.</p>`;
+    }
+    komunikat.innerHTML = html;
+  }
 
-    try {
-      const surowyTekst = naprawCudzyslowy(await plik.text());
-      const dane = JSON.parse(surowyTekst);
-      if (!dane.dni || typeof dane.dni !== "object") {
-        throw new Error("Brak sekcji 'dni' w pliku.");
-      }
-
-      const noweKlucze = Object.keys(dane.dni);
-
-      // Reimport ma ZASTĘPOWAĆ resztę planu od pierwszego dnia nowego pliku w przód —
-      // nie tylko dopisywać nowe dni. Object.assign sam z siebie nadpisuje wyłącznie
-      // klucze, które istnieją w nowym pliku, więc dzień, który w nowym planie nie ma
-      // już żadnej treści (np. bo trening przeniesiono na inny dzień), zostawałby
-      // z treścią starego planu. Dlatego najpierw czyścimy cały zakres dat od
-      // najwcześniejszego dnia nowego importu w przód, dopiero potem wgrywamy nową treść.
-      if (noweKlucze.length) {
-        const odDaty = noweKlucze.reduce((min, k) => (k < min ? k : min), noweKlucze[0]);
-        Object.keys(mockPlan).forEach((klucz) => {
-          if (klucz >= odDaty) delete mockPlan[klucz];
-        });
-      }
-
-      Object.assign(mockPlan, dane.dni);
-      zapiszPlan();
-
-      if (noweKlucze.length) {
-        const kluczeSortowane = [...noweKlucze].sort();
-        const zakres =
-          kluczeSortowane[0] === kluczeSortowane[kluczeSortowane.length - 1]
-            ? kluczeSortowane[0]
-            : `${kluczeSortowane[0]} – ${kluczeSortowane[kluczeSortowane.length - 1]}`;
-        komunikat.innerHTML = `
-          <p class="komunikat-sukces">Zaimportowano ${kluczeSortowane.length} dni planu (${zakres}). Sprawdź zakładkę Dziś/Tydzień.</p>
-          <p class="komunikat-sukces">Daty: ${kluczeSortowane.join(", ")}</p>
-        `;
-      } else {
-        komunikat.innerHTML = `<p class="komunikat-sukces">Plik wczytany, ale nie zawierał żadnych dni.</p>`;
-      }
-    } catch (err) {
-      komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny plik JSON zgodny ze schematem: ${err.message}</p>`;
+  function pokazBladImportu(err) {
+    const komunikat = container.querySelector("#import-komunikat");
+    if (komunikat) {
+      komunikat.innerHTML = `<p class="komunikat-blad">Nie udało się wczytać: ${err.message}</p>`;
     }
   }
 
@@ -251,7 +340,7 @@ export function mount(container, wroc) {
         </div>
       </div>
 
-      <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
+      <button class="dodaj-btn" data-action="dalej">Przejdź do importu planu</button>
 
       <div class="sekcja-naglowek">Kopia zapasowa</div>
       <p class="opis-sekcji">Dane siedzą tylko na tym urządzeniu. Eksportuj je od czasu do czasu, żeby nie stracić historii przy zmianie telefonu albo wyczyszczeniu przeglądarki.</p>
@@ -311,21 +400,29 @@ export function mount(container, wroc) {
   }
 
   function renderKrok2() {
-    const instrukcja = generujInstrukcje(
-      mockProfil.kategorie_wybrane,
-      mockProfil.data_startu_planu,
-      mockProfil.data_polmaratonu
-    );
+    const { od, doDnia, ostatniWPlanie } = oknoImportu();
+    const instrukcja = generujInstrukcje(mockProfil.kategorie_wybrane, od, doDnia);
+
+    const statusPlanu = ostatniWPlanie
+      ? `Plan masz wypełniony do <strong>${ostatniWPlanie}</strong>. Kolejny fragment: ${od} – ${doDnia}.`
+      : `Plan jest pusty. Pierwszy fragment: ${od} – ${doDnia}.`;
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wstecz">‹ Ustawienia</button>
       <div class="topbar"><span class="data">Import planu</span></div>
 
-      <div class="sekcja-naglowek">1. Skopiuj instrukcję do Claude lub ChatGPT</div>
-      <pre class="ai-instrukcja">${instrukcja}</pre>
+      <p class="opis-sekcji">${statusPlanu}</p>
+      <p class="opis-sekcji">Najpierw ustal plan treningowy w rozmowie z AI. Dopiero potem wklej poniższą instrukcję w tę samą rozmowę — zamieni ustalenia na plik dla apki. Plan wgrywa się fragmentami po ${DNI_W_OKNIE} dni, bo dłuższe AI zwykle urywa.</p>
+
+      <div class="sekcja-naglowek">1. Wklej instrukcję do rozmowy z AI</div>
+      <pre class="ai-instrukcja">${escapeHtml(instrukcja)}</pre>
       <button class="dodaj-btn" data-action="kopiuj">Kopiuj instrukcję</button>
 
-      <div class="sekcja-naglowek">2. Zapisz odpowiedź AI jako plik .json i zaimportuj</div>
+      <div class="sekcja-naglowek">2. Wklej odpowiedź AI tutaj</div>
+      <textarea class="import-textarea" id="wklej-plan" placeholder="Wklej całą odpowiedź AI"></textarea>
+      <button class="dodaj-btn" data-action="importuj-wklejone">Zaimportuj wklejone</button>
+
+      <div class="sekcja-naglowek">…albo wczytaj z pliku .json</div>
       <button class="dodaj-btn" data-action="importuj-plan-wybierz">Wybierz plik .json</button>
       <input type="file" accept="application/json,.json" id="import-plan-plik" style="display:none" />
       <div id="import-komunikat"></div>
@@ -343,10 +440,28 @@ export function mount(container, wroc) {
       });
     };
 
+    container.querySelector("[data-action='importuj-wklejone']").onclick = () => {
+      const tekst = container.querySelector("#wklej-plan").value;
+      if (!tekst.trim()) return;
+      try {
+        pokazWynikImportu(przetworzPlan(tekst, od));
+      } catch (err) {
+        pokazBladImportu(err);
+      }
+    };
+
     container.querySelector("[data-action='importuj-plan-wybierz']").onclick = () => {
       container.querySelector("#import-plan-plik").click();
     };
-    container.querySelector("#import-plan-plik").onchange = obslugaImportuPlanu;
+    container.querySelector("#import-plan-plik").onchange = async (event) => {
+      const plik = event.target.files[0];
+      if (!plik) return;
+      try {
+        pokazWynikImportu(przetworzPlan(await plik.text(), od));
+      } catch (err) {
+        pokazBladImportu(err);
+      }
+    };
   }
 
   renderKrok1();
