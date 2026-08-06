@@ -7,9 +7,15 @@ import {
   getRealizacja,
   zapiszRealizacje,
   mockWpisyWagi,
+  toKey,
+  addDays,
 } from "../state.js";
 
 const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu
+
+// Gest przesunięcia dnia
+const PROG_SWIPE = 50; // minimalny dystans poziomy w px
+const STREFA_KRAWEDZI = 30; // margines ekranu ignorowany (gest cofania w Safari)
 
 function ostatniaWaga() {
   if (!mockWpisyWagi.length) return null;
@@ -36,6 +42,13 @@ function kalorieDnia(planDay, realizacja) {
   return suma;
 }
 
+// Przesuwa klucz daty o n dni. Parsujemy ręcznie, bo new Date("2026-08-06")
+// jest interpretowane jako północ UTC — w innej strefie potrafi cofnąć dzień.
+function przesunKlucz(dateKey, n) {
+  const [rok, mies, dzien] = dateKey.split("-").map(Number);
+  return toKey(addDays(new Date(rok, mies - 1, dzien), n));
+}
+
 function formatujDate(dateKey) {
   const d = new Date(dateKey);
   const tekst = new Intl.DateTimeFormat("pl-PL", {
@@ -52,141 +65,6 @@ function komentarzDnia(realizacja) {
   return "Odhacz, co się da.";
 }
 
-// ---------------------------------------------------------------------
-// Bieganie — trening rozpisany na segmenty.
-//
-// Struktura z planu:
-//   segmenty: [
-//     { nazwa, czas_min?, dystans_km?, tempo?, strefa_tetna?, zakres_tetna?, opis? },
-//     { powtorzenia: N, czesci: [ segment prosty, ... ] }
-//   ]
-// Bieg ciągły = jeden segment prosty. Interwały = blok z "powtorzenia".
-// Łączny czas liczy aplikacja, nie AI.
-// ---------------------------------------------------------------------
-
-function formatujMinuty(min) {
-  if (!min) return "";
-  const calkowite = Math.round(min);
-  if (calkowite < 60) return `${calkowite} min`;
-  const h = Math.floor(calkowite / 60);
-  const m = calkowite % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
-}
-
-function formatujKm(km) {
-  if (!km) return "";
-  return `${Number(Number(km).toFixed(1))} km`;
-}
-
-function miaraTekst(min, km) {
-  return [formatujMinuty(min), formatujKm(km)].filter(Boolean).join(" · ");
-}
-
-// Sumuje czas i dystans pojedynczego segmentu (z uwzględnieniem powtórzeń).
-function sumaSegmentu(segment) {
-  if (Array.isArray(segment.czesci)) {
-    const powtorzenia = Number(segment.powtorzenia) || 1;
-    return segment.czesci.reduce(
-      (acc, czesc) => ({
-        min: acc.min + powtorzenia * (Number(czesc.czas_min) || 0),
-        km: acc.km + powtorzenia * (Number(czesc.dystans_km) || 0),
-      }),
-      { min: 0, km: 0 }
-    );
-  }
-  return { min: Number(segment.czas_min) || 0, km: Number(segment.dystans_km) || 0 };
-}
-
-function sumaTreningu(segmenty) {
-  return segmenty.reduce(
-    (acc, s) => {
-      const { min, km } = sumaSegmentu(s);
-      return { min: acc.min + min, km: acc.km + km };
-    },
-    { min: 0, km: 0 }
-  );
-}
-
-function metaSegmentu(segment) {
-  const czesci = [];
-  if (segment.tempo) czesci.push(`<span>Tempo: <strong>${segment.tempo}</strong></span>`);
-  if (segment.strefa_tetna || segment.zakres_tetna) {
-    const etykieta = segment.strefa_tetna || "Tętno";
-    const wartosc = segment.zakres_tetna || "—";
-    czesci.push(`<span>${etykieta}: <strong>${wartosc}</strong></span>`);
-  }
-  if (!czesci.length) return "";
-  return `<div class="segment-meta">${czesci.join("")}</div>`;
-}
-
-function renderujSegmentProsty(segment) {
-  const miara = miaraTekst(Number(segment.czas_min) || 0, Number(segment.dystans_km) || 0);
-  return `
-    <li class="segment">
-      <div class="segment-glowa">
-        <span class="segment-nazwa">${segment.nazwa || "Bieg"}</span>
-        ${miara ? `<span class="segment-miara">${miara}</span>` : ""}
-      </div>
-      ${metaSegmentu(segment)}
-      ${segment.opis ? `<p class="segment-opis">${segment.opis}</p>` : ""}
-    </li>
-  `;
-}
-
-function renderujBlokPowtarzany(segment) {
-  const powtorzenia = Number(segment.powtorzenia) || 1;
-  const { min, km } = sumaSegmentu(segment);
-  const miara = miaraTekst(min, km);
-  const wnetrze = segment.czesci.map(renderujSegmentProsty).join("");
-
-  return `
-    <li class="segment-blok">
-      <div class="blok-glowa">
-        <span class="blok-powtorzenia">${powtorzenia} ×</span>
-        ${miara ? `<span class="blok-miara">łącznie ${miara}</span>` : ""}
-      </div>
-      <ul class="segment-lista wciecie">${wnetrze}</ul>
-    </li>
-  `;
-}
-
-function renderujBieganie(dane) {
-  const segmenty = Array.isArray(dane.segmenty) ? dane.segmenty : null;
-
-  // Stary format planu (bez segmentów) — renderuj jak dotychczas,
-  // żeby wcześniej zaimportowany plan nie przestał nagle działać.
-  if (!segmenty || !segmenty.length) {
-    return `
-      <div class="tile-body">
-        ${dane.opis ? `<p class="opis">${dane.opis}</p>` : ""}
-        <div class="tile-meta">
-          ${dane.tempo ? `<span>Tempo: <strong>${dane.tempo}</strong></span>` : ""}
-          ${dane.zakres_tetna ? `<span>${dane.strefa_tetna || "Tętno"}: <strong>${dane.zakres_tetna}</strong></span>` : ""}
-          ${dane.kalorie ? `<span>Kalorie: <strong>${dane.kalorie} kcal</strong></span>` : ""}
-        </div>
-        <p class="segment-opis">Ten trening pochodzi ze starszego importu — bez rozpisania na segmenty.</p>
-      </div>
-    `;
-  }
-
-  const suma = sumaTreningu(segmenty);
-  const dystansCalkowity = Number(dane.dystans_km) || suma.km;
-  const podsumowanie = miaraTekst(suma.min, dystansCalkowity);
-
-  const lista = segmenty
-    .map((s) => (Array.isArray(s.czesci) ? renderujBlokPowtarzany(s) : renderujSegmentProsty(s)))
-    .join("");
-
-  return `
-    <div class="tile-body">
-      ${podsumowanie ? `<p class="bieg-podsumowanie">${podsumowanie}</p>` : ""}
-      ${dane.opis ? `<p class="opis">${dane.opis}</p>` : ""}
-      <ul class="segment-lista">${lista}</ul>
-      ${dane.kalorie ? `<p class="kalorie-info">${dane.kalorie} kcal</p>` : ""}
-    </div>
-  `;
-}
-
 function renderujKafelek(kategoria, planDay, realizacja) {
   const dane = planDay[kategoria];
   if (!dane) return ""; // brak wpisu = brak treningu tej kategorii tego dnia
@@ -195,9 +73,18 @@ function renderujKafelek(kategoria, planDay, realizacja) {
   let tresc = "";
 
   if (kategoria === "bieganie") {
-    tresc = renderujBieganie(dane);
+    tresc = `
+      <div class="tile-body">
+        <p class="opis">${dane.opis}</p>
+        <div class="tile-meta">
+          <span>Tempo: <strong>${dane.tempo}</strong></span>
+          <span>${dane.strefa_tetna}: <strong>${dane.zakres_tetna}</strong></span>
+          ${dane.kalorie ? `<span>Kalorie: <strong>${dane.kalorie} kcal</strong></span>` : ""}
+        </div>
+      </div>
+    `;
   } else if (kategoria === "drazki" || kategoria === "dom") {
-    const pozycje = (dane.cwiczenia || [])
+    const pozycje = dane.cwiczenia
       .map((c) => `<li><span class="nazwa-cwiczenia">${c.nazwa}</span><span class="ilosc">${c.ilosc}</span></li>`)
       .join("");
     tresc = `
@@ -218,7 +105,9 @@ function renderujKafelek(kategoria, planDay, realizacja) {
   `;
 }
 
-export function mount(container, dateKey) {
+// onZmianaDnia — opcjonalny callback (nowyKluczDaty). Jeśli podany,
+// widok obsługuje przesuwanie palcem w lewo/prawo.
+export function mount(container, dateKey, onZmianaDnia) {
   const planDay = getPlanDay(dateKey);
   const realizacja = getRealizacja(dateKey);
 
@@ -236,8 +125,6 @@ export function mount(container, dateKey) {
           <label for="km-input-${dateKey}">Marsz</label>
           <input id="km-input-${dateKey}" class="km-input" type="number" step="0.1" min="0"
                  placeholder="km" value="${realizacja.km_marsz.wartosc}" data-field="km-marsz" />
-          <button class="checkbox-binary ${realizacja.km_marsz.potwierdzone ? "checked" : ""}"
-                  data-action="km-potwierdzenie" aria-label="Potwierdź marsz"></button>
         </div>
         <div class="fixed-divider"></div>
         <div class="fixed-item">
@@ -291,8 +178,6 @@ export function mount(container, dateKey) {
     if (action === "tristate") {
       const kat = el.dataset.category;
       realizacja.kategorie[kat] = cycleTristate(realizacja.kategorie[kat] ?? "niezrealizowany");
-    } else if (action === "km-potwierdzenie") {
-      realizacja.km_marsz.potwierdzone = !realizacja.km_marsz.potwierdzone;
     } else if (action === "trzymanie-michy") {
       realizacja.trzymanie_michy = !realizacja.trzymanie_michy;
     } else if (action === "day-state") {
@@ -309,6 +194,40 @@ export function mount(container, dateKey) {
       zapiszRealizacje(dateKey);
     }
   };
+
+  // --- Przesuwanie dnia gestem ---
+  if (typeof onZmianaDnia === "function") {
+    let startX = null;
+    let startY = null;
+
+    container.ontouchstart = (event) => {
+      startX = null;
+      if (event.touches.length !== 1) return;
+      // Gest zaczęty na polu formularza zostawiamy przeglądarce.
+      if (event.target.closest("input, textarea, select")) return;
+
+      const dotyk = event.touches[0];
+      const przyKrawedzi =
+        dotyk.clientX < STREFA_KRAWEDZI || dotyk.clientX > window.innerWidth - STREFA_KRAWEDZI;
+      if (przyKrawedzi) return; // to gest cofania przeglądarki, nie nasz
+
+      startX = dotyk.clientX;
+      startY = dotyk.clientY;
+    };
+
+    container.ontouchend = (event) => {
+      if (startX === null) return;
+      const dotyk = event.changedTouches[0];
+      const dx = dotyk.clientX - startX;
+      const dy = dotyk.clientY - startY;
+      startX = null;
+
+      if (Math.abs(dx) < PROG_SWIPE) return; // za krótkie
+      if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // to był scroll w pionie
+
+      onZmianaDnia(przesunKlucz(dateKey, dx < 0 ? 1 : -1));
+    };
+  }
 
   render();
 }

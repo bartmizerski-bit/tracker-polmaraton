@@ -23,6 +23,18 @@ export function mount(container) {
   let poniedzialek = poniedzialekTygodnia(new Date());
   let wybranaData = toKey(new Date());
 
+  // Wywoływane po przesunięciu palcem w widoku dnia.
+  // Gest przesuwa zawsze o jeden dzień, więc wyjście poza tydzień
+  // oznacza dokładnie skok o 7 dni w odpowiednią stronę.
+  function zmienDzien(nowyKlucz) {
+    const pozaTygodniem = nowyKlucz < toKey(poniedzialek) || nowyKlucz > toKey(addDays(poniedzialek, 6));
+    if (pozaTygodniem) {
+      poniedzialek = addDays(poniedzialek, nowyKlucz > wybranaData ? 7 : -7);
+    }
+    wybranaData = nowyKlucz;
+    render();
+  }
+
   function render() {
     const dni = [...Array(7)].map((_, i) => addDays(poniedzialek, i));
 
@@ -67,7 +79,7 @@ export function mount(container) {
       render();
     };
 
-    mountDzien(container.querySelector("#dzien-szczegoly"), wybranaData);
+    mountDzien(container.querySelector("#dzien-szczegoly"), wybranaData, zmienDzien);
   }
 
   render();

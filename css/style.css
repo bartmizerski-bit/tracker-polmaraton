@@ -862,3 +862,22 @@ body {
   margin: 0 0 0.25rem;
   line-height: 1.4;
 }
+
+/* Przewijanie dni gestem — blokada poziomych gestów przeglądarki */
+#widok {
+  touch-action: pan-y;
+}
+
+/* Powrót do dzisiejszego dnia w zakładce "Dziś" */
+.wroc-dzis {
+  align-self: flex-start;
+  background: var(--color-ink-light);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 999px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
