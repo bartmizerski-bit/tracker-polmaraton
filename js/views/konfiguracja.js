@@ -8,8 +8,6 @@ import {
   wyczyscWszystkieDane,
   eksportujDane,
   importujDane,
-  toKey,
-  addDays,
 } from "../state.js";
 
 // Telefony (zwłaszcza iPhone przy wpisywaniu/wklejaniu przez niektóre pola)
@@ -22,165 +20,123 @@ function naprawCudzyslowy(tekst) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 }
 
-// AI notorycznie dokleja "Oto Twój plan:" na początku i ```json dookoła.
-// Zamiast prosić, żeby tego nie robiło — po prostu bierzemy wszystko
-// od pierwszego { do ostatniego }.
-function wytnijJson(tekst) {
-  const start = tekst.indexOf("{");
-  const koniec = tekst.lastIndexOf("}");
-  if (start === -1 || koniec === -1 || koniec < start) return tekst;
-  return tekst.slice(start, koniec + 1);
+// Walidacja segmentów biegu — wyłapuje najczęstsze błędy AI zanim
+// niedokończony plan wyląduje w bazie i zepsuje widok dnia.
+function sprawdzPlanBiegowy(dni) {
+  const problemy = [];
+
+  Object.entries(dni).forEach(([data, dzien]) => {
+    const bieg = dzien && dzien.bieganie;
+    if (!bieg) return;
+
+    if (!Array.isArray(bieg.segmenty) || bieg.segmenty.length === 0) {
+      problemy.push(`${data}: brak tablicy "segmenty" w treningu biegowym`);
+      return;
+    }
+
+    bieg.segmenty.forEach((segment, i) => {
+      const gdzie = `${data}, segment ${i + 1}`;
+
+      if (Array.isArray(segment.czesci)) {
+        if (!segment.powtorzenia) problemy.push(`${gdzie}: blok bez "powtorzenia"`);
+        if (!segment.czesci.length) problemy.push(`${gdzie}: pusta lista "czesci"`);
+        segment.czesci.forEach((czesc, j) => {
+          if (Array.isArray(czesc.czesci)) {
+            problemy.push(`${gdzie}.${j + 1}: zagnieżdżony blok powtórzeń (niedozwolone)`);
+          }
+          if (!czesc.czas_min && !czesc.dystans_km) {
+            problemy.push(`${gdzie}.${j + 1}: brak "czas_min" i "dystans_km"`);
+          }
+        });
+        return;
+      }
+
+      if (!segment.czas_min && !segment.dystans_km) {
+        problemy.push(`${gdzie}: brak "czas_min" i "dystans_km"`);
+      }
+    });
+  });
+
+  return problemy;
 }
 
-// Przecinek przed zamykającym nawiasem — drugi najczęstszy błąd modeli.
-function usunWiszacePrzecinki(tekst) {
-  return tekst.replace(/,(\s*[}\]])/g, "$1");
-}
+function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
+  let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
+Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
 
-function przygotujDoParsowania(tekst) {
-  return usunWiszacePrzecinki(wytnijJson(naprawCudzyslowy(tekst)));
-}
+Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
 
-function escapeHtml(tekst) {
-  return tekst.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+Zasady:
+1. Struktura: { "meta": {...}, "dni": {...} }.
+2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy. Fazy MUSZĄ pokrywać cały zakres dat bez dziur i bez nakładania się.
+3. Dla każdego dnia dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
 
-// --- Okno importu: zawsze 28 dni, licząc od miejsca, w którym kończy się plan ---
-
-const DNI_W_OKNIE = 28;
-
-function oknoImportu() {
-  const klucze = Object.keys(mockPlan).sort();
-  const dzis = toKey(new Date());
-
-  let od;
-  if (klucze.length) {
-    const poOstatnim = toKey(addDays(new Date(klucze[klucze.length - 1]), 1));
-    od = poOstatnim < dzis ? dzis : poOstatnim; // plan się zestarzał → start od dziś
-  } else {
-    od = mockProfil.data_startu_planu || dzis;
-  }
-
-  const doDnia = toKey(addDays(new Date(od), DNI_W_OKNIE - 1));
-  return { od, doDnia, ostatniWPlanie: klucze.length ? klucze[klucze.length - 1] : null };
-}
-
-function listaDatOkna(od) {
-  return [...Array(DNI_W_OKNIE)].map((_, i) => toKey(addDays(new Date(od), i)));
-}
-
-// --- Treść instrukcji dla AI ---
-
-function generujInstrukcje(kategorie, od, doDnia) {
-  const listaKategorii = kategorie.join(", ");
-
-  // Schemat pokazuje tylko te kategorie, które user faktycznie wybrał.
-  const przykladoweDni = [];
-
-  const dzienA = [];
+  let numer = 4;
   if (kategorie.includes("bieganie")) {
-    dzienA.push(`    "bieganie": {
-      "opis": "Interwały 2 min bieg / 3 min marsz, 6 powtórzeń",
-      "tempo": "5:30-6:00 min/km",
-      "strefa_tetna": "Strefa 2",
-      "zakres_tetna": "128-142 bpm",
-      "kalorie": 320
-    }`);
+    tekst += `
+
+${numer}. Dla "bieganie" KAŻDY trening musi być rozpisany krok po kroku w tablicy "segmenty" (min. 1 element).
+   Użytkownik ma wiedzieć dokładnie, co robić minuta po minucie — nie wolno chować struktury treningu w opisie.
+
+   Segment prosty:
+   { "nazwa": "Trucht", "czas_min": 10, "dystans_km": 2, "tempo": "6:30-7:00 min/km", "strefa_tetna": "Strefa 2", "zakres_tetna": "125-140 bpm" }
+   - "nazwa" wymagana; wymagane też co najmniej jedno z "czas_min" / "dystans_km" (liczby, nie tekst).
+   - tempo, strefa_tetna i zakres_tetna podawaj OSOBNO DLA KAŻDEGO SEGMENTU — trucht, bieg szybki i schłodzenie mają różne tempo i różne tętno. Nigdy nie podawaj jednego uśrednionego tempa dla całego treningu.
+   - opcjonalne "opis": jedno krótkie zdanie wskazówki do tego segmentu.
+
+   Segment powtarzany (interwały):
+   { "powtorzenia": 6, "czesci": [ segment prosty, segment prosty ] }
+   - bez "nazwa", bez "czas_min" na tym poziomie — czas liczy się z części.
+   - NIE zagnieżdżaj bloku powtarzanego wewnątrz innego bloku. Maksymalnie jedno piętro.
+
+   Dalsze zasady:
+   - Bieg ciągły = jeden segment prosty. Nie rozbijaj go sztucznie.
+   - Rozgrzewkę i schłodzenie zawsze jako osobne segmenty, nigdy jako wzmiankę w opisie.
+   - "opis" treningu to jedno zdanie o CELU (np. "Interwały tempowe pod próg mleczanowy."), bez powtarzania struktury.
+   - "dystans_km" na poziomie treningu (opcjonalnie) = łączny dystans. ŁĄCZNEGO CZASU NIE PODAWAJ — aplikacja liczy go sama z segmentów.
+   - "kalorie": szacunek dla całego treningu.
+   Formaty sztywne: tempo ZAWSZE "M:SS-M:SS min/km", zakres_tetna ZAWSZE "NNN-NNN bpm".
+
+   Przykład kompletnego dnia biegowego:
+   "bieganie": {
+     "opis": "Interwały tempowe.",
+     "dystans_km": 8,
+     "kalorie": 380,
+     "segmenty": [
+       { "nazwa": "Rozgrzewka", "czas_min": 10, "tempo": "6:30-7:00 min/km", "strefa_tetna": "Strefa 2", "zakres_tetna": "125-140 bpm" },
+       { "powtorzenia": 6, "czesci": [
+         { "nazwa": "Bieg szybki", "czas_min": 2, "tempo": "4:40-5:00 min/km", "strefa_tetna": "Strefa 4", "zakres_tetna": "160-172 bpm" },
+         { "nazwa": "Trucht", "czas_min": 3, "tempo": "7:00-7:30 min/km", "strefa_tetna": "Strefa 2", "zakres_tetna": "130-145 bpm" }
+       ]},
+       { "nazwa": "Schłodzenie", "czas_min": 10, "tempo": "6:30-7:00 min/km", "strefa_tetna": "Strefa 1", "zakres_tetna": "115-130 bpm" }
+     ]
+   }`;
+    numer++;
   }
   if (kategorie.includes("drazki")) {
-    dzienA.push(`    "drazki": {
-      "cwiczenia": [
-        { "nazwa": "Podciąganie nachwytem", "ilosc": "4x6" },
-        { "nazwa": "Zwis aktywny", "ilosc": "3x30s" }
-      ],
-      "kalorie": 180
-    }`);
+    tekst += `
+
+${numer}. Dla "drazki": lista ćwiczeń jako tablica { "nazwa", "ilosc" } + szacowane kalorie.`;
+    numer++;
+  }
+  if (kategorie.includes("dom")) {
+    tekst += `
+
+${numer}. Dla "dom": analogicznie jak drążki.`;
+    numer++;
   }
   const walkiLubSilownia = kategorie.find((k) => k === "sporty_walki" || k === "silownia");
   if (walkiLubSilownia) {
-    dzienA.push(`    "${walkiLubSilownia}": true`);
+    tekst += `
+
+${numer}. Dla "${walkiLubSilownia}": wyłącznie wartość true w dniach wystąpienia — BEZ opisu, BEZ kalorii.`;
+    numer++;
   }
-  przykladoweDni.push(`  "${od}": {\n${dzienA.join(",\n")}\n  }`);
+  tekst += `
 
-  if (kategorie.includes("dom")) {
-    przykladoweDni.push(`  "${toKey(addDays(new Date(od), 1))}": {
-    "dom": {
-      "cwiczenia": [
-        { "nazwa": "Pompki", "ilosc": "4x15" },
-        { "nazwa": "Przysiady", "ilosc": "4x20" }
-      ],
-      "kalorie": 210
-    }
-  }`);
-  }
-  przykladoweDni.push(`  "${toKey(addDays(new Date(od), 2))}": {}`);
+${numer}. NIE planuj km marszu ani niczego związanego z dietą — poza zakresem tego pliku.`;
 
-  const schemat = `{\n  "dni": {\n${przykladoweDni.join(",\n")}\n  }\n}`;
-
-  // Opis pól — tylko dla wybranych kategorii.
-  const pola = [];
-  if (kategorie.includes("bieganie")) {
-    pola.push(`"bieganie" — obiekt z pięcioma polami, wszystkie obowiązkowe:
-   "opis"          string, konkretna treść treningu
-   "tempo"         string, ZAWSZE dokładnie w formacie "M:SS-M:SS min/km"
-   "strefa_tetna"  string, ZAWSZE dokładnie "Strefa N", gdzie N to cyfra 1-5
-   "zakres_tetna"  string, ZAWSZE dokładnie w formacie "NNN-NNN bpm"
-   "kalorie"       LICZBA, bez cudzysłowów, bez słowa "kcal" (poprawnie: 320, błędnie: "320 kcal")`);
-  }
-  if (kategorie.includes("drazki")) {
-    pola.push(`"drazki" — obiekt z dwoma polami:
-   "cwiczenia"     tablica obiektów { "nazwa": string, "ilosc": string }
-                   "ilosc" to ZAWSZE string, nawet gdy to sama liczba: "4x6", "3x30s", "10"
-   "kalorie"       LICZBA`);
-  }
-  if (kategorie.includes("dom")) {
-    pola.push(`"dom" — dokładnie taka sama struktura jak "drazki": "cwiczenia" + "kalorie".`);
-  }
-  if (walkiLubSilownia) {
-    pola.push(`"${walkiLubSilownia}" — wartość to dokładnie true (wartość logiczna, NIE "true" w cudzysłowach).
-   Bez opisu, bez ćwiczeń, bez kalorii. Sam fakt, że tego dnia trening jest.`);
-  }
-
-  return `Zamieniasz nasz gotowy plan treningowy na plik JSON dla mojej aplikacji.
-
-To zadanie techniczne, nie planistyczne. NIE układasz planu od nowa, NIE zmieniasz jego treści, NIE dodajesz nic od siebie — przepisujesz to, co już wspólnie ustaliliśmy, do formatu poniżej. Jeśli czegoś w naszym planie brakuje (np. tętna dla danego biegu), uzupełnij to sensownie, ale nie przebudowuj planu.
-
-ZAKRES: dokładnie dni od ${od} do ${doDnia}. To ${DNI_W_OKNIE} dni. Ani jednego mniej, ani jednego więcej. Nie wychodź poza ten zakres, nawet jeśli plan obejmuje dłuższy okres — resztę wygeneruję osobno.
-
-KATEGORIE: ${listaKategorii}. Żadnych innych kluczy kategorii.
-
-FORMA ODPOWIEDZI: wyłącznie JSON. Bez wstępu, bez komentarza na końcu, bez znaczników \`\`\`json. Twoja odpowiedź w całości trafia prosto do pliku .json — pierwszy znak to {, ostatni to }.
-
-SCHEMAT — skopiuj tę strukturę dokładnie:
-
-${schemat}
-
-ZASADY:
-
-1. Najwyższy poziom to obiekt z jednym kluczem: "dni". Nic więcej — bez "meta", bez "fazy", bez "plan".
-2. Wewnątrz "dni" kluczem jest data w formacie "RRRR-MM-DD". Muszą wystąpić WSZYSTKIE ${DNI_W_OKNIE} dni z zakresu, po kolei, bez luk.
-3. Dzień bez żadnego treningu to pusty obiekt: {}. Nie pomijaj takiego dnia i nie wpisuj w nim "odpoczynek".
-4. W danym dniu umieszczaj TYLKO te kategorie, które faktycznie tego dnia występują. Pozostałe po prostu pomiń.
-5. Nazwy kluczy kategorii zapisuj dokładnie tak, jak w schemacie — małymi literami, bez polskich znaków, bez spacji (${listaKategorii}).
-
-POLA:
-
-${pola.map((p, i) => `${i + 1}. ${p}`).join("\n\n")}
-
-CZEGO NIE ROBIĆ:
-
-- Nie dodawaj pól spoza schematu (żadnych "uwagi", "notatki", "dzien_tygodnia", "faza").
-- Nie skracaj odpowiedzi. Żadnych "...", "// pozostałe dni analogicznie", "(tu powtórz schemat)". Każdy z ${DNI_W_OKNIE} dni wypisany w całości.
-- Nie planuj km marszu ani niczego związanego z dietą — to jest poza zakresem tego pliku.
-- Nie owijaj odpowiedzi w markdown.
-
-ZANIM WYŚLESZ, SPRAWDŹ:
-
-1. Pierwszy znak odpowiedzi to {, ostatni to }.
-2. W "dni" jest dokładnie ${DNI_W_OKNIE} kluczy: od "${od}" do "${doDnia}", bez ani jednej brakującej daty.
-3. Nigdzie nie ma przecinka bezpośrednio przed } ani przed ].
-4. Każde "kalorie" to liczba, nie tekst.
-5. Użyte są wyłącznie klucze kategorii z listy: ${listaKategorii}.`;
+  return tekst;
 }
 
 export function mount(container, wroc) {
@@ -228,41 +184,36 @@ export function mount(container, wroc) {
     }
   }
 
-  // Wspólna ścieżka dla importu planu z pliku i z wklejonego tekstu.
-  function przetworzPlan(surowyTekst, oczekiwaneOd) {
-    const dane = JSON.parse(przygotujDoParsowania(surowyTekst));
-    if (!dane.dni || typeof dane.dni !== "object") {
-      throw new Error("Brak sekcji 'dni'.");
-    }
-
-    const klucze = Object.keys(dane.dni);
-    const zleFormaty = klucze.filter((k) => !/^\d{4}-\d{2}-\d{2}$/.test(k));
-    if (zleFormaty.length) {
-      throw new Error(`Klucze dni nie są datami RRRR-MM-DD (np. "${zleFormaty[0]}").`);
-    }
-
-    Object.assign(mockPlan, dane.dni);
-    zapiszPlan();
-
-    // Ostrzeżenie, a nie błąd — plan i tak się zapisał.
-    const oczekiwane = listaDatOkna(oczekiwaneOd);
-    const brakujace = oczekiwane.filter((d) => !(d in dane.dni));
-    return { ile: klucze.length, brakujace };
-  }
-
-  function pokazWynikImportu(wynik) {
+  async function obslugaImportuPlanu(event) {
+    const plik = event.target.files[0];
+    if (!plik) return;
     const komunikat = container.querySelector("#import-komunikat");
-    let html = `<p class="komunikat-sukces">Zaimportowano ${wynik.ile} dni planu.</p>`;
-    if (wynik.brakujace.length) {
-      html += `<p class="komunikat-blad">Uwaga: brakuje ${wynik.brakujace.length} dni z oczekiwanego zakresu (pierwszy: ${wynik.brakujace[0]}). AI prawdopodobnie urwało odpowiedź — poproś o brakujące dni i zaimportuj je ponownie.</p>`;
-    }
-    komunikat.innerHTML = html;
-  }
 
-  function pokazBladImportu(err) {
-    const komunikat = container.querySelector("#import-komunikat");
-    if (komunikat) {
-      komunikat.innerHTML = `<p class="komunikat-blad">Nie udało się wczytać: ${err.message}</p>`;
+    try {
+      const surowyTekst = naprawCudzyslowy(await plik.text());
+      const dane = JSON.parse(surowyTekst);
+      if (!dane.dni || typeof dane.dni !== "object") {
+        throw new Error("Brak sekcji 'dni' w pliku.");
+      }
+
+      const problemy = sprawdzPlanBiegowy(dane.dni);
+
+      Object.assign(mockPlan, dane.dni);
+      zapiszPlan();
+
+      let html = `<p class="komunikat-sukces">Zaimportowano ${Object.keys(dane.dni).length} dni planu. Sprawdź zakładkę Dziś/Tydzień.</p>`;
+      if (problemy.length) {
+        const lista = problemy.slice(0, 8).map((p) => `<li>${p}</li>`).join("");
+        const reszta = problemy.length > 8 ? `<li>…i ${problemy.length - 8} więcej</li>` : "";
+        html += `
+          <p class="komunikat-blad">Plan zapisany, ale AI nie trzymało się schematu w ${problemy.length} miejscach — te treningi wyświetlą się niekompletnie:</p>
+          <ul class="lista-problemow">${lista}${reszta}</ul>
+          <p class="opis-sekcji">Najprościej: wklej AI listę problemów i poproś o poprawiony plik.</p>
+        `;
+      }
+      komunikat.innerHTML = html;
+    } catch (err) {
+      komunikat.innerHTML = `<p class="komunikat-blad">To nie jest poprawny plik JSON zgodny ze schematem: ${err.message}</p>`;
     }
   }
 
@@ -340,7 +291,7 @@ export function mount(container, wroc) {
         </div>
       </div>
 
-      <button class="dodaj-btn" data-action="dalej">Przejdź do importu planu</button>
+      <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
 
       <div class="sekcja-naglowek">Kopia zapasowa</div>
       <p class="opis-sekcji">Dane siedzą tylko na tym urządzeniu. Eksportuj je od czasu do czasu, żeby nie stracić historii przy zmianie telefonu albo wyczyszczeniu przeglądarki.</p>
@@ -400,29 +351,21 @@ export function mount(container, wroc) {
   }
 
   function renderKrok2() {
-    const { od, doDnia, ostatniWPlanie } = oknoImportu();
-    const instrukcja = generujInstrukcje(mockProfil.kategorie_wybrane, od, doDnia);
-
-    const statusPlanu = ostatniWPlanie
-      ? `Plan masz wypełniony do <strong>${ostatniWPlanie}</strong>. Kolejny fragment: ${od} – ${doDnia}.`
-      : `Plan jest pusty. Pierwszy fragment: ${od} – ${doDnia}.`;
+    const instrukcja = generujInstrukcje(
+      mockProfil.kategorie_wybrane,
+      mockProfil.data_startu_planu,
+      mockProfil.data_polmaratonu
+    );
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wstecz">‹ Ustawienia</button>
       <div class="topbar"><span class="data">Import planu</span></div>
 
-      <p class="opis-sekcji">${statusPlanu}</p>
-      <p class="opis-sekcji">Najpierw ustal plan treningowy w rozmowie z AI. Dopiero potem wklej poniższą instrukcję w tę samą rozmowę — zamieni ustalenia na plik dla apki. Plan wgrywa się fragmentami po ${DNI_W_OKNIE} dni, bo dłuższe AI zwykle urywa.</p>
-
-      <div class="sekcja-naglowek">1. Wklej instrukcję do rozmowy z AI</div>
-      <pre class="ai-instrukcja">${escapeHtml(instrukcja)}</pre>
+      <div class="sekcja-naglowek">1. Skopiuj instrukcję do Claude lub ChatGPT</div>
+      <pre class="ai-instrukcja">${instrukcja}</pre>
       <button class="dodaj-btn" data-action="kopiuj">Kopiuj instrukcję</button>
 
-      <div class="sekcja-naglowek">2. Wklej odpowiedź AI tutaj</div>
-      <textarea class="import-textarea" id="wklej-plan" placeholder="Wklej całą odpowiedź AI"></textarea>
-      <button class="dodaj-btn" data-action="importuj-wklejone">Zaimportuj wklejone</button>
-
-      <div class="sekcja-naglowek">…albo wczytaj z pliku .json</div>
+      <div class="sekcja-naglowek">2. Zapisz odpowiedź AI jako plik .json i zaimportuj</div>
       <button class="dodaj-btn" data-action="importuj-plan-wybierz">Wybierz plik .json</button>
       <input type="file" accept="application/json,.json" id="import-plan-plik" style="display:none" />
       <div id="import-komunikat"></div>
@@ -440,28 +383,10 @@ export function mount(container, wroc) {
       });
     };
 
-    container.querySelector("[data-action='importuj-wklejone']").onclick = () => {
-      const tekst = container.querySelector("#wklej-plan").value;
-      if (!tekst.trim()) return;
-      try {
-        pokazWynikImportu(przetworzPlan(tekst, od));
-      } catch (err) {
-        pokazBladImportu(err);
-      }
-    };
-
     container.querySelector("[data-action='importuj-plan-wybierz']").onclick = () => {
       container.querySelector("#import-plan-plik").click();
     };
-    container.querySelector("#import-plan-plik").onchange = async (event) => {
-      const plik = event.target.files[0];
-      if (!plik) return;
-      try {
-        pokazWynikImportu(przetworzPlan(await plik.text(), od));
-      } catch (err) {
-        pokazBladImportu(err);
-      }
-    };
+    container.querySelector("#import-plan-plik").onchange = obslugaImportuPlanu;
   }
 
   renderKrok1();
