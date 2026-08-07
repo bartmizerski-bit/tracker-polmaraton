@@ -137,13 +137,14 @@ ${numer}. Dla "bieganie" KAŻDY trening musi być rozpisany krok po kroku w tabl
   if (kategorie.includes("drazki")) {
     tekst += `
 
-${numer}. Dla "drazki": lista ćwiczeń jako tablica { "nazwa", "ilosc" } + szacowane kalorie.`;
+${numer}. Dla "drazki": lista ćwiczeń jako tablica { "nazwa", "ilosc" } + szacowane kalorie.
+   "ilosc" ma być krótkie i konkretne — sama liczba/zakres i jednostka (np. "8-10 powt.", "3x8", "30 sek."). BEZ dopisków w nawiasach, BEZ komentarzy typu "ile dasz radę", "w każdą stronę", uwag o obecnym poziomie usera itp. Jeśli chcesz dodać kontekst, to wyłącznie w krótkim, osobnym polu "opis" — nie upychaj go w "ilosc".`;
     numer++;
   }
   if (kategorie.includes("dom")) {
     tekst += `
 
-${numer}. Dla "dom": analogicznie jak drążki.`;
+${numer}. Dla "dom": analogicznie jak drążki — ta sama zasada dot. krótkiego, konkretnego "ilosc" bez zbędnych dopisków.`;
     numer++;
   }
   const walkiLubSilownia = kategorie.find((k) => k === "sporty_walki" || k === "silownia");
