@@ -22,25 +22,12 @@ function naprawCudzyslowy(tekst) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 }
 
-// Okno kolejnego fragmentu planu do wygenerowania: zawsze 28 dni (4 tygodnie),
-// żeby odpowiedź AI nie była tak długa, że model ją urwie w połowie.
-// Jeśli plan jest pusty — start od daty startu planu. Jeśli coś już jest
-// zaimportowane — start od dnia po ostatnim dniu, który już mamy.
-function obliczOknoPlanu(dataStartu) {
-  const dniIstniejace = Object.keys(mockPlan).sort();
-
-  let poczatek;
-  if (dniIstniejace.length) {
-    const ostatni = dniIstniejace[dniIstniejace.length - 1];
-    const [rok, mies, dzien] = ostatni.split("-").map(Number);
-    poczatek = toKey(addDays(new Date(rok, mies - 1, dzien), 1));
-  } else {
-    poczatek = dataStartu;
-  }
-
-  const [rok, mies, dzien] = poczatek.split("-").map(Number);
-  const koniec = toKey(addDays(new Date(rok, mies - 1, dzien), 27));
-
+// Okno kolejnego fragmentu planu do wygenerowania: zawsze 28 dni (4 tygodnie)
+// licząc od dzisiaj, niezależnie od tego, co już siedzi w mockPlan —
+// user chce zawsze świeży fragment "od teraz", nie kontynuację starego importu.
+function obliczOknoPlanu() {
+  const poczatek = toKey(new Date());
+  const koniec = toKey(addDays(new Date(), 27));
   return { poczatek, koniec };
 }
 
@@ -376,7 +363,7 @@ export function mount(container, wroc) {
   }
 
   function renderKrok2() {
-    const okno = obliczOknoPlanu(mockProfil.data_startu_planu);
+    const okno = obliczOknoPlanu();
     const instrukcja = generujInstrukcje(
       mockProfil.kategorie_wybrane,
       mockProfil.data_startu_planu,
