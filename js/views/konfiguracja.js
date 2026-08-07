@@ -22,12 +22,13 @@ function naprawCudzyslowy(tekst) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 }
 
-// Okno kolejnego fragmentu planu do wygenerowania: zawsze 28 dni (4 tygodnie)
-// licząc od dzisiaj, niezależnie od tego, co już siedzi w mockPlan —
-// user chce zawsze świeży fragment "od teraz", nie kontynuację starego importu.
+// Okno kolejnego fragmentu planu do wygenerowania: zawsze 14 dni (2 tygodnie,
+// licząc razem z dzisiejszym dniem) licząc od dzisiaj, niezależnie od tego,
+// co już siedzi w mockPlan — user chce zawsze świeży fragment "od teraz",
+// nie kontynuację starego importu.
 function obliczOknoPlanu() {
   const poczatek = toKey(new Date());
-  const koniec = toKey(addDays(new Date(), 27));
+  const koniec = toKey(addDays(new Date(), 13));
   return { poczatek, koniec };
 }
 
@@ -72,15 +73,23 @@ function sprawdzPlanBiegowy(dni) {
 }
 
 function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu, okno) {
+  const walkiLubSilowniaWstep = kategorie.find((k) => k === "sporty_walki" || k === "silownia");
+
+  const zdaniePytanie = walkiLubSilowniaWstep
+    ? `Jedyne pytanie, jakie wolno Ci zadać userowi przed wygenerowaniem planu, to pytanie o dni, w które trenuje "${walkiLubSilowniaWstep}" — patrz zasada niżej. Poza tym wypadkiem: żadnych pytań, żadnego dopytywania — generuj plan od razu.`
+    : `Nie zadawaj żadnych pytań przed wygenerowaniem planu — generuj go od razu.`;
+
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
 Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
+Jeśli masz możliwość wygenerowania faktycznego pliku do pobrania (np. przez uruchomienie kodu) — zrób to i podaj gotowy plik .json do pobrania. NIE wklejaj treści jako tekst w wiadomości, jeśli możesz zamiast tego dać plik.
+${zdaniePytanie}
 
 Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
 
 Zasady:
 1. Struktura: { "meta": {...}, "dni": {...} }.
 2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy, obejmujące CAŁY zakres od daty startu do daty półmaratonu. Fazy MUSZĄ pokrywać cały ten zakres bez dziur i bez nakładania się — nawet jeśli w tej turze generujesz szczegóły tylko dla części z nich.
-3. Sekcję "dni" wypełnij WYŁĄCZNIE dla okresu od ${okno.poczatek} do ${okno.koniec} (28 dni, 4 tygodnie). Nie generuj dni spoza tego okna, nawet jeśli plan sięga dalej — kolejny fragment zostanie wygenerowany osobno, tym samym promptem, gdy ten okres się skończy.
+3. Sekcję "dni" wypełnij WYŁĄCZNIE dla okresu od ${okno.poczatek} do ${okno.koniec} (14 dni, 2 tygodnie licząc razem z dzisiejszym dniem). Nie generuj dni spoza tego okna, nawet jeśli plan sięga dalej — kolejny fragment zostanie wygenerowany osobno, tym samym promptem, gdy ten okres się skończy.
 4. Dla każdego dnia w tym oknie dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
 
   let numer = 5;
@@ -141,7 +150,7 @@ ${numer}. Dla "dom": analogicznie jak drążki.`;
   if (walkiLubSilownia) {
     tekst += `
 
-${numer}. Dla "${walkiLubSilownia}": wyłącznie wartość true w dniach wystąpienia — BEZ opisu, BEZ kalorii.`;
+${numer}. Dla "${walkiLubSilownia}": NIE planuj od nowa, kiedy user trenuje tę kategorię — to już wiesz albo ustaliliście wcześniej. Po prostu uwzględnij te dni w JSON-ie. W dniach wystąpienia dodaj wyłącznie wartość true — BEZ opisu, BEZ kalorii. Jeśli NIE wiesz, w które dni tygodnia user ma "${walkiLubSilownia}" — zapytaj o to PRZED wygenerowaniem planu, zamiast zgadywać.`;
     numer++;
   }
   tekst += `
@@ -374,7 +383,7 @@ export function mount(container, wroc) {
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wstecz">‹ Ustawienia</button>
       <div class="topbar"><span class="data">Import planu</span></div>
-      <p class="opis-sekcji">Ten fragment obejmuje: ${okno.poczatek} – ${okno.koniec} (4 tygodnie). Kolejny fragment wygenerujesz tu ponownie, gdy ten się skończy.</p>
+      <p class="opis-sekcji">Ten fragment obejmuje: ${okno.poczatek} – ${okno.koniec} (2 tygodnie, licząc razem z dzisiejszym dniem). Kolejny fragment wygenerujesz tu ponownie, gdy ten się skończy.</p>
 
       <div class="sekcja-naglowek">1. Skopiuj instrukcję do Claude lub ChatGPT</div>
       <pre class="ai-instrukcja">${instrukcja}</pre>
