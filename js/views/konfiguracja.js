@@ -8,6 +8,8 @@ import {
   wyczyscWszystkieDane,
   eksportujDane,
   importujDane,
+  toKey,
+  addDays,
 } from "../state.js";
 
 // Telefony (zwłaszcza iPhone przy wpisywaniu/wklejaniu przez niektóre pola)
@@ -18,6 +20,28 @@ function naprawCudzyslowy(tekst) {
   return tekst
     .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+}
+
+// Okno kolejnego fragmentu planu do wygenerowania: zawsze 28 dni (4 tygodnie),
+// żeby odpowiedź AI nie była tak długa, że model ją urwie w połowie.
+// Jeśli plan jest pusty — start od daty startu planu. Jeśli coś już jest
+// zaimportowane — start od dnia po ostatnim dniu, który już mamy.
+function obliczOknoPlanu(dataStartu) {
+  const dniIstniejace = Object.keys(mockPlan).sort();
+
+  let poczatek;
+  if (dniIstniejace.length) {
+    const ostatni = dniIstniejace[dniIstniejace.length - 1];
+    const [rok, mies, dzien] = ostatni.split("-").map(Number);
+    poczatek = toKey(addDays(new Date(rok, mies - 1, dzien), 1));
+  } else {
+    poczatek = dataStartu;
+  }
+
+  const [rok, mies, dzien] = poczatek.split("-").map(Number);
+  const koniec = toKey(addDays(new Date(rok, mies - 1, dzien), 27));
+
+  return { poczatek, koniec };
 }
 
 // Walidacja segmentów biegu — wyłapuje najczęstsze błędy AI zanim
@@ -60,7 +84,7 @@ function sprawdzPlanBiegowy(dni) {
   return problemy;
 }
 
-function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu) {
+function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu, okno) {
   let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
 Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
 
@@ -68,10 +92,11 @@ Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPol
 
 Zasady:
 1. Struktura: { "meta": {...}, "dni": {...} }.
-2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy. Fazy MUSZĄ pokrywać cały zakres dat bez dziur i bez nakładania się.
-3. Dla każdego dnia dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
+2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy, obejmujące CAŁY zakres od daty startu do daty półmaratonu. Fazy MUSZĄ pokrywać cały ten zakres bez dziur i bez nakładania się — nawet jeśli w tej turze generujesz szczegóły tylko dla części z nich.
+3. Sekcję "dni" wypełnij WYŁĄCZNIE dla okresu od ${okno.poczatek} do ${okno.koniec} (28 dni, 4 tygodnie). Nie generuj dni spoza tego okna, nawet jeśli plan sięga dalej — kolejny fragment zostanie wygenerowany osobno, tym samym promptem, gdy ten okres się skończy.
+4. Dla każdego dnia w tym oknie dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
 
-  let numer = 4;
+  let numer = 5;
   if (kategorie.includes("bieganie")) {
     tekst += `
 
@@ -351,15 +376,18 @@ export function mount(container, wroc) {
   }
 
   function renderKrok2() {
+    const okno = obliczOknoPlanu(mockProfil.data_startu_planu);
     const instrukcja = generujInstrukcje(
       mockProfil.kategorie_wybrane,
       mockProfil.data_startu_planu,
-      mockProfil.data_polmaratonu
+      mockProfil.data_polmaratonu,
+      okno
     );
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wstecz">‹ Ustawienia</button>
       <div class="topbar"><span class="data">Import planu</span></div>
+      <p class="opis-sekcji">Ten fragment obejmuje: ${okno.poczatek} – ${okno.koniec} (4 tygodnie). Kolejny fragment wygenerujesz tu ponownie, gdy ten się skończy.</p>
 
       <div class="sekcja-naglowek">1. Skopiuj instrukcję do Claude lub ChatGPT</div>
       <pre class="ai-instrukcja">${instrukcja}</pre>
