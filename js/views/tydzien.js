@@ -37,6 +37,7 @@ export function mount(container) {
 
   function render() {
     const dni = [...Array(7)].map((_, i) => addDays(poniedzialek, i));
+    const dzisiaj = toKey(new Date());
 
     const paski = dni
       .map((d) => {
@@ -54,6 +55,11 @@ export function mount(container) {
 
     const zakresLabel = `${new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short" }).format(dni[0])} – ${new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short" }).format(dni[6])}`;
 
+    const przyciskDzis =
+      wybranaData !== dzisiaj
+        ? `<button class="wroc-dzis-btn" data-action="wroc-dzis">‹ Wróć do dziś</button>`
+        : "";
+
     container.innerHTML = `
       <div class="tydzien-nav">
         <button class="tydzien-strzalka" data-action="tydzien-wstecz" aria-label="Poprzedni tydzień">‹</button>
@@ -61,6 +67,7 @@ export function mount(container) {
         <button class="tydzien-strzalka" data-action="tydzien-wprzod" aria-label="Następny tydzień">›</button>
       </div>
       <div class="dni-pasek">${paski}</div>
+      ${przyciskDzis}
       <div id="dzien-szczegoly"></div>
     `;
 
@@ -78,6 +85,15 @@ export function mount(container) {
       wybranaData = el.dataset.date;
       render();
     };
+
+    const wrocBtn = container.querySelector("[data-action='wroc-dzis']");
+    if (wrocBtn) {
+      wrocBtn.onclick = () => {
+        poniedzialek = poniedzialekTygodnia(new Date());
+        wybranaData = dzisiaj;
+        render();
+      };
+    }
 
     mountDzien(container.querySelector("#dzien-szczegoly"), wybranaData, zmienDzien);
   }

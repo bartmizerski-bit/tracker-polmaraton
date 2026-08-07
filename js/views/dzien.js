@@ -232,7 +232,7 @@ function renderujKafelek(kategoria, planDay, realizacja) {
 }
 
 // onZmianaDnia — opcjonalny callback (nowyKluczDaty). Jeśli podany,
-// widok obsługuje przesuwanie palcem w lewo/prawo.
+// widok obsługuje przesuwanie palcem w lewo/prawo, z animacją.
 export function mount(container, dateKey, onZmianaDnia) {
   const planDay = getPlanDay(dateKey);
   const realizacja = getRealizacja(dateKey);
@@ -285,14 +285,16 @@ export function mount(container, dateKey, onZmianaDnia) {
     }
 
     container.innerHTML = `
-      <div class="topbar">
-        <span class="data">${formatujDate(dateKey)}</span>
-        <span class="komentarz">${komentarzDnia(realizacja)}</span>
+      <div class="dzien-widok">
+        <div class="topbar">
+          <span class="data">${formatujDate(dateKey)}</span>
+          <span class="komentarz">${komentarzDnia(realizacja)}</span>
+        </div>
+        ${daystateButtons}
+        ${fixedRow}
+        ${kalorieCard}
+        ${glownaTresc}
       </div>
-      ${daystateButtons}
-      ${fixedRow}
-      ${kalorieCard}
-      ${glownaTresc}
     `;
   }
 
@@ -321,13 +323,15 @@ export function mount(container, dateKey, onZmianaDnia) {
     }
   };
 
-  // --- Przesuwanie dnia gestem ---
+  // --- Przesuwanie dnia gestem, z animacją ---
   if (typeof onZmianaDnia === "function") {
     let startX = null;
     let startY = null;
+    let przesuwanie = false;
 
     container.ontouchstart = (event) => {
       startX = null;
+      przesuwanie = false;
       if (event.touches.length !== 1) return;
       // Gest zaczęty na polu formularza zostawiamy przeglądarce.
       if (event.target.closest("input, textarea, select")) return;
@@ -341,17 +345,67 @@ export function mount(container, dateKey, onZmianaDnia) {
       startY = dotyk.clientY;
     };
 
-    container.ontouchend = (event) => {
+    container.ontouchmove = (event) => {
       if (startX === null) return;
-      const dotyk = event.changedTouches[0];
+      const dotyk = event.touches[0];
       const dx = dotyk.clientX - startX;
       const dy = dotyk.clientY - startY;
+
+      if (!przesuwanie) {
+        if (Math.abs(dx) < 10) return;
+        if (Math.abs(dx) < Math.abs(dy) * 1.5) {
+          startX = null; // to był scroll w pionie — oddajemy gest przeglądarce
+          return;
+        }
+        przesuwanie = true;
+      }
+
+      const panel = container.querySelector(".dzien-widok");
+      if (panel) {
+        panel.style.transition = "none";
+        panel.style.transform = `translateX(${dx}px)`;
+      }
+    };
+
+    container.ontouchend = (event) => {
+      const panel = container.querySelector(".dzien-widok");
+
+      if (startX === null || !przesuwanie) {
+        startX = null;
+        przesuwanie = false;
+        return;
+      }
+
+      const dotyk = event.changedTouches[0];
+      const dx = dotyk.clientX - startX;
       startX = null;
+      przesuwanie = false;
+      if (!panel) return;
 
-      if (Math.abs(dx) < PROG_SWIPE) return; // za krótkie
-      if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // to był scroll w pionie
+      panel.style.transition = "transform 0.22s ease-out";
 
-      onZmianaDnia(przesunKlucz(dateKey, dx < 0 ? 1 : -1));
+      if (Math.abs(dx) < PROG_SWIPE) {
+        panel.style.transform = "translateX(0)";
+        return;
+      }
+
+      const kierunekDni = dx < 0 ? 1 : -1;
+      panel.style.transform = `translateX(${dx < 0 ? -100 : 100}%)`;
+      panel.addEventListener(
+        "transitionend",
+        () => onZmianaDnia(przesunKlucz(dateKey, kierunekDni)),
+        { once: true }
+      );
+    };
+
+    container.ontouchcancel = () => {
+      startX = null;
+      przesuwanie = false;
+      const panel = container.querySelector(".dzien-widok");
+      if (panel) {
+        panel.style.transition = "transform 0.22s ease-out";
+        panel.style.transform = "translateX(0)";
+      }
     };
   }
 

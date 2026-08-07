@@ -273,105 +273,6 @@ body {
   color: var(--color-text-muted);
 }
 
-/* ---------------------------------------------------------------
-   Bieganie — trening rozpisany na segmenty
-   --------------------------------------------------------------- */
-
-/* Łączny czas i dystans — najważniejsza informacja w kafelku biegu */
-.bieg-podsumowanie {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  line-height: 1;
-  color: var(--color-lime);
-  margin: 0 0 0.35rem;
-  letter-spacing: 0.02em;
-}
-
-.segment-lista {
-  list-style: none;
-  margin: 0.6rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-.segment-lista.wciecie {
-  margin-top: 0.45rem;
-  gap: 0.45rem;
-}
-
-/* Pojedynczy krok treningu */
-.segment {
-  border-left: 2px solid var(--color-track-red);
-  padding-left: 0.6rem;
-}
-
-.segment-glowa {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.segment-nazwa {
-  font-weight: 600;
-}
-
-.segment-miara {
-  color: var(--color-lime);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.segment-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.1rem 0.7rem;
-  margin-top: 0.15rem;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.segment-meta strong {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.segment-opis {
-  margin: 0.2rem 0 0;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* Blok powtarzany — interwały */
-.segment-blok {
-  background: rgba(255, 255, 255, 0.035);
-  border-radius: 12px;
-  padding: 0.55rem 0.65rem;
-}
-
-.blok-glowa {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.blok-powtorzenia {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  letter-spacing: 0.04em;
-  color: var(--color-track-red);
-}
-
-.blok-miara {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
 /* Stan dnia zastępujący kafelki (przerwa / leń) */
 .day-off-message {
   background: var(--color-ink-light);
@@ -833,15 +734,6 @@ body {
   margin-top: 0.5rem;
 }
 
-/* Lista problemów po imporcie planu */
-.lista-problemow {
-  margin: 0.4rem 0 0;
-  padding-left: 1.1rem;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
 /* Strefa niebezpieczna — reset danych */
 .reset-btn {
   background: transparent;
@@ -863,21 +755,116 @@ body {
   line-height: 1.4;
 }
 
-/* Przewijanie dni gestem — blokada poziomych gestów przeglądarki */
-#widok {
-  touch-action: pan-y;
+/* Bieganie — segmenty i bloki powtarzane */
+.bieg-podsumowanie {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--color-lime);
+  margin: 0 0 0.4rem;
+  letter-spacing: 0.02em;
 }
 
-/* Powrót do dzisiejszego dnia w zakładce "Dziś" */
-.wroc-dzis {
-  align-self: flex-start;
-  background: var(--color-ink-light);
-  border: 1.5px solid var(--color-text-muted);
-  border-radius: 999px;
-  color: var(--color-text);
-  font-family: var(--font-body);
-  font-size: 0.8rem;
+.segment-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.segment-lista.wciecie {
+  margin-top: 0.4rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.segment {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+}
+
+.segment-glowa {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.segment-nazwa {
   font-weight: 600;
+}
+
+.segment-miara {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.segment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 0.2rem;
+}
+
+.segment-meta strong {
+  color: var(--color-lime);
+  font-weight: 600;
+}
+
+.segment-opis {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0.3rem 0 0;
+}
+
+.segment-blok {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+}
+
+.blok-glowa {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.blok-powtorzenia {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--color-track-red);
+  letter-spacing: 0.02em;
+}
+
+.blok-miara {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Animacja swipe między dniami */
+.dzien-widok {
+  will-change: transform;
+}
+
+#dzien-szczegoly {
+  overflow-x: hidden;
+}
+
+.wroc-dzis-btn {
+  display: block;
+  margin: -0.25rem auto 0.25rem;
+  background: var(--color-ink-light);
+  border: 1.5px solid var(--color-lime);
+  border-radius: 20px;
+  color: var(--color-lime);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.78rem;
   padding: 0.35rem 0.9rem;
   cursor: pointer;
 }
