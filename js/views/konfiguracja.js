@@ -299,6 +299,15 @@ export function mount(container, wroc) {
         </div>
       </div>
 
+      <div class="sekcja-naglowek">Timer przerwy</div>
+      <div class="fixed-row">
+        <div class="fixed-item">
+          <label>Domyślna długość (sek.)</label>
+          <input type="number" step="1" min="1" class="km-input" id="timer-input" value="${mockProfil.domyslny_timer_sek}" />
+        </div>
+      </div>
+      <p class="opis-sekcji">Widoczna jako przycisk nad drążkami/domem, w dniach kiedy je masz w planie.</p>
+
       <div class="sekcja-naglowek">Terminy</div>
       <div class="fixed-row">
         <div class="fixed-item">
@@ -356,6 +365,9 @@ export function mount(container, wroc) {
       mockProfil.wiek = Number(container.querySelector("#wiek-input").value);
       mockProfil.data_startu_planu = container.querySelector("#start-input").value;
       mockProfil.data_polmaratonu = container.querySelector("#race-input").value;
+
+      const timerSek = Number(container.querySelector("#timer-input").value);
+      mockProfil.domyslny_timer_sek = timerSek > 0 ? timerSek : 60;
 
       const waga = parseFloat(container.querySelector("#waga-input").value);
       if (waga) {
