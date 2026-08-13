@@ -63,6 +63,7 @@ export const mockProfil = {
   kategorie_wybrane: ["bieganie"],
   data_startu_planu: toKey(new Date()),
   data_polmaratonu: toKey(addDays(new Date(), 90)),
+  domyslny_timer_sek: 60,
 };
 
 // --- Wpisy wagi (puste na start, do BMI) ---
@@ -250,4 +251,5 @@ export async function wyczyscWszystkieDane() {
   mockProfil.kategorie_wybrane = ["bieganie"];
   mockProfil.data_startu_planu = toKey(new Date());
   mockProfil.data_polmaratonu = toKey(addDays(new Date(), 90));
+  mockProfil.domyslny_timer_sek = 60;
 }
