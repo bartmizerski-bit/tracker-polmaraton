@@ -868,3 +868,65 @@ body {
   padding: 0.35rem 0.9rem;
   cursor: pointer;
 }
+
+/* Timer przerwy — nad kafelkiem drążków/domu */
+.timer-przerwy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--color-ink-light);
+  border: 1.5px solid var(--color-track-red);
+  border-radius: 14px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.timer-btn {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-track-red);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.timer-czas {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  color: var(--color-lime);
+  min-width: 2.6ch;
+  text-align: right;
+}
+
+.timer-przerwy.timer-running {
+  border-color: var(--color-lime);
+}
+
+.timer-przerwy.timer-running .timer-btn {
+  background: transparent;
+  border: 1.5px solid var(--color-lime);
+  color: var(--color-lime);
+  padding: 0.4rem 0.75rem;
+}
+
+.timer-przerwy.timer-done {
+  border-color: var(--color-lime);
+  background: var(--color-lime);
+}
+
+.timer-przerwy.timer-done .timer-btn {
+  background: var(--color-ink);
+  color: var(--color-lime);
+}
+
+.timer-przerwy.timer-done .timer-czas {
+  color: var(--color-ink);
+}
