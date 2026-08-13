@@ -7,9 +7,11 @@ import {
   getRealizacja,
   zapiszRealizacje,
   mockWpisyWagi,
+  mockProfil,
   toKey,
   addDays,
 } from "../state.js";
+import { createTimerWidget } from "../timer.js";
 
 const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu
 
@@ -236,6 +238,7 @@ function renderujKafelek(kategoria, planDay, realizacja) {
 export function mount(container, dateKey, onZmianaDnia) {
   const planDay = getPlanDay(dateKey);
   const realizacja = getRealizacja(dateKey);
+  const timerWidget = createTimerWidget(() => mockProfil.domyslny_timer_sek);
 
   function render() {
     const daystateButtons = `
@@ -268,10 +271,23 @@ export function mount(container, dateKey, onZmianaDnia) {
       </div>
     `;
 
+    // Timer przerwy pokazujemy raz, nad pierwszym kafelkiem drążków/domu —
+    // jeśli oba są w planie tego dnia, dzielą jeden wspólny przycisk.
+    const pokazTimer = Boolean(planDay.drazki || planDay.dom);
+    let wstawionoTimer = false;
+
     let glownaTresc;
     if (realizacja.stan_dnia === "normalny") {
       const kafelki = Object.keys(CATEGORY_LABELS)
-        .map((k) => renderujKafelek(k, planDay, realizacja))
+        .map((k) => {
+          const tile = renderujKafelek(k, planDay, realizacja);
+          if (!tile) return "";
+          if (pokazTimer && !wstawionoTimer && (k === "drazki" || k === "dom")) {
+            wstawionoTimer = true;
+            return timerWidget.html() + tile;
+          }
+          return tile;
+        })
         .join("");
       glownaTresc = kafelki.trim()
         ? kafelki
@@ -296,6 +312,8 @@ export function mount(container, dateKey, onZmianaDnia) {
         ${glownaTresc}
       </div>
     `;
+
+    timerWidget.attach(container);
   }
 
   container.onclick = (event) => {
