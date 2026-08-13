@@ -337,6 +337,11 @@ export function mount(container, wroc) {
     `;
 
     container.querySelector("[data-action='eksportuj']").onclick = eksportuj;
+    container.querySelector("#timer-input").onchange = (e) => {
+      const timerSek = Number(e.target.value);
+      mockProfil.domyslny_timer_sek = timerSek > 0 ? timerSek : 60;
+      zapiszProfil();
+    };
     container.querySelector("[data-action='importuj-wybierz']").onclick = () => {
       container.querySelector("#import-plik").click();
     };
