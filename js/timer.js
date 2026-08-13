@@ -70,7 +70,7 @@ export function createTimerWidget(pobierzDomyslneSek) {
     if (czas) czas.textContent = status === "idle" ? "" : formatujCzas(pozostaloSek);
     if (przycisk) {
       przycisk.textContent =
-        status === "running" ? "Przerwij" : status === "done" ? "Jeszcze raz" : "Start przerwy";
+        status === "running" ? "Przerwij" : status === "done" ? "Jeszcze raz" : "Odliczanie";
     }
   }
 
@@ -109,7 +109,7 @@ export function createTimerWidget(pobierzDomyslneSek) {
   function html() {
     return `
       <div class="timer-przerwy" data-timer-root>
-        <button class="timer-btn" data-timer-action type="button">Start przerwy</button>
+        <button class="timer-btn" data-timer-action type="button">Odliczanie</button>
         <span class="timer-czas" data-timer-czas></span>
       </div>
     `;
