@@ -31,11 +31,20 @@ function dzienZrealizowany(dateKey) {
   return wszystkieOdhaczone ? "sukces" : "porazka";
 }
 
+// Bez sztywnej "daty startu planu" w profilu punktem odniesienia dla passy
+// i statystyk jest najwcześniejsza data, dla której faktycznie coś zapisano
+// (realizacja albo plan). Brak danych → zakres zwija się do samego dzisiaj.
+function najwczesniejszaDataDanych() {
+  const klucze = [...Object.keys(mockRealizacja), ...Object.keys(mockPlan)];
+  if (!klucze.length) return null;
+  return klucze.reduce((min, klucz) => (klucz < min ? klucz : min), klucze[0]);
+}
+
 function zakresDat() {
   const dzisiaj = new Date();
-  const startProfil = mockProfil.data_startu_planu ? new Date(mockProfil.data_startu_planu) : dzisiaj;
-  const start = startProfil <= dzisiaj ? startProfil : dzisiaj;
-  return { start, dzisiaj };
+  const najwczesniejszyKlucz = najwczesniejszaDataDanych();
+  const start = najwczesniejszyKlucz ? new Date(najwczesniejszyKlucz) : dzisiaj;
+  return { start: start <= dzisiaj ? start : dzisiaj, dzisiaj };
 }
 
 export function obliczPasse() {
@@ -219,7 +228,6 @@ export function obliczOdblokowaneAchievementy() {
   const najlepszaPassa = Math.max(aktualna, najdluzsza);
   const sumaKm = obliczSumeKm();
   const sesje = obliczSesje();
-  const dzisiaj = toKey(new Date());
 
   return {
     streak_3: najlepszaPassa >= 3,
@@ -233,9 +241,19 @@ export function obliczOdblokowaneAchievementy() {
     km_250: sumaKm >= 250,
     sesje_bieganie_10: (sesje.bieganie || 0) >= 10,
     sesje_drazki_10: (sesje.drazki || 0) >= 10,
-    dzien_startu: Boolean(mockProfil.data_startu_planu) && dzisiaj >= mockProfil.data_startu_planu,
-    dzien_wyscigu: Boolean(mockProfil.data_polmaratonu) && dzisiaj >= mockProfil.data_polmaratonu,
     powrot_po_przerwie: sprawdzPowrotPoPrzerwie(),
     miesiac_bez_lenia: sprawdzMiesiacBezLenia(),
   };
+}
+
+// --- Przypomnienie o samoocenie postępu (co ~8 tygodni) ---
+const DNI_MIEDZY_OCENAMI = 56;
+
+export function obliczPrzypomnienie() {
+  const ostatnia = mockProfil.ostatnia_ocena_postepu;
+  if (!ostatnia) return { potrzebne: false, dniOd: 0 };
+
+  const dzisiaj = new Date();
+  const dniOd = Math.floor((dzisiaj - new Date(ostatnia)) / (1000 * 60 * 60 * 24));
+  return { potrzebne: dniOd >= DNI_MIEDZY_OCENAMI, dniOd };
 }
