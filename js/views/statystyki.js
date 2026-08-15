@@ -9,7 +9,9 @@ import {
   obliczDniLen,
   obliczSumeKalorii,
   obliczProcentRealizacjiPlanu,
+  obliczPrzypomnienie,
 } from "../obliczenia.js";
+import { mockPlan, mockProfil, zapiszProfil, toKey } from "../state.js";
 
 const CATEGORY_LABELS = {
   bieganie: "Bieganie",
@@ -29,6 +31,38 @@ export function mount(container) {
   const dniLen = obliczDniLen();
   const sumaKalorii = obliczSumeKalorii();
   const procentRealizacji = obliczProcentRealizacjiPlanu();
+
+  const fazy = mockPlan?.meta?.fazy;
+  const fazaAktualna = Array.isArray(fazy) && fazy.length ? fazy[fazy.length - 1] : null;
+  const przypomnienie = obliczPrzypomnienie();
+
+  const fazaHtml = fazaAktualna
+    ? `
+    <div class="pr-card" style="margin-bottom:1rem">
+      <div class="pr-card-header">
+        <span class="pr-nazwa">Obecna faza</span>
+      </div>
+      <div class="pr-najlepszy">${fazaAktualna.nazwa}</div>
+      ${fazaAktualna.cel ? `<p class="opis-sekcji">Kryterium wejścia do następnej: ${fazaAktualna.cel}</p>` : ""}
+    </div>
+  `
+    : `
+    <div class="pr-card" style="margin-bottom:1rem">
+      <div class="pr-card-header">
+        <span class="pr-nazwa">Obecna faza</span>
+      </div>
+      <p class="brak-wykresu">Brak fazy w zaimportowanym planie — sprawdź Konfigurację.</p>
+    </div>
+  `;
+
+  const przypomnienieHtml = przypomnienie.potrzebne
+    ? `
+    <div class="pr-card" style="margin-bottom:1rem">
+      <p class="komunikat-blad">Minęło ${przypomnienie.dniOd} dni od ostatniej oceny postępu. Sprawdź jakościowo: ból, dystans biegu ciągłego, tygodniowy czas w Z1-Z2 — i zdecyduj, czy plan wymaga zmiany.</p>
+      <button class="dodaj-btn" data-action="ocena-zresetuj">Oceniłem, przypomnij za 8 tyg.</button>
+    </div>
+  `
+    : "";
 
   const paski = realizacjaTygodni
     .map(
@@ -57,6 +91,9 @@ export function mount(container) {
 
   container.innerHTML = `
     <div class="topbar"><span class="data">Statystyki</span></div>
+
+    ${fazaHtml}
+    ${przypomnienieHtml}
 
     <div class="stat-grid-duze">
       <div class="stat-card duzy">
@@ -114,4 +151,13 @@ export function mount(container) {
     <div class="sekcja-naglowek">Realizacja planu — ostatnie 8 tygodni</div>
     <div class="bar-chart">${paski}</div>
   `;
+
+  const przyciskOcena = container.querySelector("[data-action='ocena-zresetuj']");
+  if (przyciskOcena) {
+    przyciskOcena.onclick = () => {
+      mockProfil.ostatnia_ocena_postepu = toKey(new Date());
+      zapiszProfil();
+      mount(container);
+    };
+  }
 }
