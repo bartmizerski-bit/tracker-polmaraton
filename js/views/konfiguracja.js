@@ -72,24 +72,24 @@ function sprawdzPlanBiegowy(dni) {
   return problemy;
 }
 
-function generujInstrukcje(kategorie, dataStartu, dataPolmaratonu, okno) {
+function generujInstrukcje(kategorie, okno) {
   const walkiLubSilowniaWstep = kategorie.find((k) => k === "sporty_walki" || k === "silownia");
 
   const zdaniePytanie = walkiLubSilowniaWstep
     ? `Jedyne pytanie, jakie wolno Ci zadać userowi przed wygenerowaniem planu, to pytanie o dni, w które trenuje "${walkiLubSilowniaWstep}" — patrz zasada niżej. Poza tym wypadkiem: żadnych pytań, żadnego dopytywania — generuj plan od razu.`
     : `Nie zadawaj żadnych pytań przed wygenerowaniem planu — generuj go od razu.`;
 
-  let tekst = `Jesteś generatorem planu treningowego do przygotowań do półmaratonu.
+  let tekst = `Jesteś generatorem planu treningowego pod ogólną sprawność i przekraczanie własnych granic. To plan ciągły — bez sztywnego terminu, bez konkretnej daty docelowej ani konkretnego wydarzenia (np. zawodów), do którego trening ma prowadzić.
 Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
 Jeśli masz możliwość wygenerowania faktycznego pliku do pobrania (np. przez uruchomienie kodu) — zrób to i podaj gotowy plik .json do pobrania. NIE wklejaj treści jako tekst w wiadomości, jeśli możesz zamiast tego dać plik.
 ${zdaniePytanie}
 
-Dane wejściowe: data startu planu: ${dataStartu}, data półmaratonu: ${dataPolmaratonu}, wybrane kategorie treningowe: ${kategorie.join(", ")}.
+Dane wejściowe: wybrane kategorie treningowe: ${kategorie.join(", ")}.
 
 Zasady:
 1. Struktura: { "meta": {...}, "dni": {...} }.
-2. Podziel plan na min. 2 fazy (np. Baza / Budowanie / Szczyt / Tapering) w meta.fazy, obejmujące CAŁY zakres od daty startu do daty półmaratonu. Fazy MUSZĄ pokrywać cały ten zakres bez dziur i bez nakładania się — nawet jeśli w tej turze generujesz szczegóły tylko dla części z nich.
-3. Sekcję "dni" wypełnij WYŁĄCZNIE dla okresu od ${okno.poczatek} do ${okno.koniec} (14 dni, 2 tygodnie licząc razem z dzisiejszym dniem). Nie generuj dni spoza tego okna, nawet jeśli plan sięga dalej — kolejny fragment zostanie wygenerowany osobno, tym samym promptem, gdy ten okres się skończy.
+2. meta.fazy to tablica faz W KOLEJNOŚCI CHRONOLOGICZNEJ, gdzie OSTATNI element to faza aktualna. Faza to { "nazwa": "...", "cel": "..." } — bez żadnych dat granicznych. "cel" to krótki, jakościowy opis kryterium, po którym warto przejść do kolejnej fazy (np. "90 min ciągłego biegu bez bólu", "marszobieg 12 kg"). Jeśli faza się nie zmieniła względem poprzedniego pliku — powtórz ten sam ostatni wpis, żeby aplikacja miała co pokazać. Fazy NIE mają z góry ustalonej kolejności ani liczby — kolejne okna planu mogą wydłużać tę samą fazę bez zapowiedzi, dopóki nie zgłoszę zmiany.
+3. Sekcję "dni" wypełnij WYŁĄCZNIE dla okresu od ${okno.poczatek} do ${okno.koniec} (14 dni, 2 tygodnie licząc razem z dzisiejszym dniem). Nie generuj dni spoza tego okna — kolejny fragment wygeneruję osobno, tym samym promptem, gdy ten okres się skończy.
 4. Dla każdego dnia w tym oknie dodaj wpis TYLKO dla kategorii, które faktycznie tego dnia występują — pomiń pozostałe.`;
 
   let numer = 5;
@@ -308,20 +308,6 @@ export function mount(container, wroc) {
       </div>
       <p class="opis-sekcji">Widoczna jako przycisk nad drążkami/domem, w dniach kiedy je masz w planie.</p>
 
-      <div class="sekcja-naglowek">Terminy</div>
-      <div class="fixed-row">
-        <div class="fixed-item">
-          <label>Start planu</label>
-          <input type="date" class="km-input data-input" id="start-input" value="${mockProfil.data_startu_planu}" />
-        </div>
-      </div>
-      <div class="fixed-row" style="margin-top:0.5rem">
-        <div class="fixed-item">
-          <label>Półmaraton</label>
-          <input type="date" class="km-input data-input" id="race-input" value="${mockProfil.data_polmaratonu}" />
-        </div>
-      </div>
-
       <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
 
       <div class="sekcja-naglowek">Kopia zapasowa</div>
@@ -368,8 +354,6 @@ export function mount(container, wroc) {
       mockProfil.kategorie_wybrane = kategorie;
       mockProfil.wzrost_cm = Number(container.querySelector("#wzrost-input").value);
       mockProfil.wiek = Number(container.querySelector("#wiek-input").value);
-      mockProfil.data_startu_planu = container.querySelector("#start-input").value;
-      mockProfil.data_polmaratonu = container.querySelector("#race-input").value;
 
       const timerSek = Number(container.querySelector("#timer-input").value);
       mockProfil.domyslny_timer_sek = timerSek > 0 ? timerSek : 60;
@@ -391,12 +375,7 @@ export function mount(container, wroc) {
 
   function renderKrok2() {
     const okno = obliczOknoPlanu();
-    const instrukcja = generujInstrukcje(
-      mockProfil.kategorie_wybrane,
-      mockProfil.data_startu_planu,
-      mockProfil.data_polmaratonu,
-      okno
-    );
+    const instrukcja = generujInstrukcje(mockProfil.kategorie_wybrane, okno);
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wstecz">‹ Ustawienia</button>
