@@ -61,9 +61,8 @@ export const mockProfil = {
   wzrost_cm: "",
   wiek: "",
   kategorie_wybrane: ["bieganie"],
-  data_startu_planu: toKey(new Date()),
-  data_polmaratonu: toKey(addDays(new Date(), 90)),
   domyslny_timer_sek: 60,
+  ostatnia_ocena_postepu: toKey(new Date()),
 };
 
 // --- Wpisy wagi (puste na start, do BMI) ---
@@ -87,10 +86,8 @@ export const mockAchievementyAutomatyczne = [
   { id: "km_250", nazwa: "Chodząca ambicja", opis: "250 km marszu sumarycznie" },
   { id: "sesje_bieganie_10", nazwa: "Dziesięć razy w butach do biegania", opis: "10 sesji biegowych" },
   { id: "sesje_drazki_10", nazwa: "Dłonie już znają drążek", opis: "10 sesji na drążkach" },
-  { id: "dzien_startu", nazwa: "Największy entuzjazm tego cyklu", opis: "Dzień 1 planu" },
   { id: "powrot_po_przerwie", nazwa: "Wróciłeś. Kolana też się zdziwiły", opis: "Powrót zaraz po dniu przerwy" },
   { id: "miesiac_bez_lenia", nazwa: "Ani jednego lenia", opis: "Miesiąc bez dnia oznaczonego jako leń" },
-  { id: "dzien_wyscigu", nazwa: "Dzień wyścigu", opis: "Dzień półmaratonu" },
 ];
 
 export const mockAchievementyWlasne = [];
@@ -249,7 +246,6 @@ export async function wyczyscWszystkieDane() {
   mockProfil.wzrost_cm = "";
   mockProfil.wiek = "";
   mockProfil.kategorie_wybrane = ["bieganie"];
-  mockProfil.data_startu_planu = toKey(new Date());
-  mockProfil.data_polmaratonu = toKey(addDays(new Date(), 90));
   mockProfil.domyslny_timer_sek = 60;
+  mockProfil.ostatnia_ocena_postepu = toKey(new Date());
 }
