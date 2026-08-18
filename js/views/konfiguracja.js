@@ -80,8 +80,8 @@ function generujInstrukcje(kategorie, okno) {
     : `Nie zadawaj żadnych pytań przed wygenerowaniem planu — generuj go od razu.`;
 
   let tekst = `Jesteś generatorem planu treningowego pod ogólną sprawność i przekraczanie własnych granic. To plan ciągły — bez sztywnego terminu, bez konkretnej daty docelowej ani konkretnego wydarzenia (np. zawodów), do którego trening ma prowadzić.
-Zwróć WYŁĄCZNIE poprawny JSON zgodny ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Twoja odpowiedź zostanie zapisana bezpośrednio jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
-Jeśli masz możliwość wygenerowania faktycznego pliku do pobrania (np. przez uruchomienie kodu) — zrób to i podaj gotowy plik .json do pobrania. NIE wklejaj treści jako tekst w wiadomości, jeśli możesz zamiast tego dać plik.
+WYNIK MUSI BYĆ GOTOWYM PLIKIEM .json DO POBRANIA — nie tekstem wklejonym w treści wiadomości. Wygeneruj plik (np. uruchamiając kod) i podaj go jako plik do pobrania. To jest wymóg, nie opcja: jeśli Twoje środowisko pozwala na wygenerowanie pliku, masz obowiązek to zrobić, nawet jeśli wklejenie tekstu byłoby szybsze. Wklejenie samego JSON-a jako tekstu w odpowiedzi jest akceptowalne WYŁĄCZNIE wtedy, gdy tworzenie plików jest technicznie niemożliwe w tej rozmowie.
+Niezależnie od formy: treść musi być WYŁĄCZNIE poprawnym JSON-em zgodnym ze schematem poniżej. Nic więcej — żadnego tekstu przed ani po, żadnego code fence markdown (bez \`\`\`json na początku i \`\`\` na końcu). Ta odpowiedź trafi bezpośrednio do aplikacji jako plik .json, więc jedno dodatkowe słowo, zdanie albo znacznik code fence sprawi, że plik będzie nieprawidłowy.
 ${zdaniePytanie}
 
 Dane wejściowe: wybrane kategorie treningowe: ${kategorie.join(", ")}.
