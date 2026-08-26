@@ -1,7 +1,15 @@
 // Widok szczegółów pojedynczego dnia — używany zarówno przez zakładkę
 // "Dziś", jak i przez widok "Tydzień" (dla wybranego dnia w tygodniu).
+//
+// KATEGORIE SĄ DOWOLNE. Aplikacja nie zna żadnej stałej listy sportów —
+// renderuje wszystko, co znajdzie w planie na dany dzień, w kolejności
+// kluczy z pliku planu. O wyglądzie kafelka decyduje KSZTAŁT danych:
+//   segmenty  → rozpisanie krok po kroku
+//   cwiczenia → lista ćwiczeń
+//   oba naraz → segmenty, pod nimi lista
+//   ani jedno → sam checkbox (+ opcjonalny opis)
 import {
-  CATEGORY_LABELS,
+  etykietaKategorii,
   cycleTristate,
   getPlanDay,
   getRealizacja,
@@ -11,6 +19,7 @@ import {
   toKey,
   addDays,
 } from "../state.js";
+import { kalorieZKategorii } from "../obliczenia.js";
 import { createTimerWidget } from "../timer.js";
 
 const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu
@@ -39,16 +48,7 @@ function kalorieMarszu(km) {
 }
 
 function kalorieDnia(planDay, realizacja) {
-  let suma = 0;
-  ["bieganie", "drazki", "dom"].forEach((kat) => {
-    const dane = planDay[kat];
-    const stan = realizacja.kategorie?.[kat];
-    if (dane?.kalorie && (stan === "zrealizowany" || stan === "czesciowo")) {
-      suma += dane.kalorie;
-    }
-  });
-  suma += kalorieMarszu(parseFloat(realizacja.km_marsz.wartosc));
-  return suma;
+  return kalorieZKategorii(planDay, realizacja) + kalorieMarszu(parseFloat(realizacja.km_marsz.wartosc));
 }
 
 function formatujDate(dateKey) {
@@ -68,15 +68,17 @@ function komentarzDnia(realizacja) {
 }
 
 // ---------------------------------------------------------------------
-// Bieganie — trening rozpisany na segmenty.
+// Segmenty — rozpisanie treningu krok po kroku. Dostępne dla DOWOLNEJ
+// kategorii, nie tylko biegowej: obwód, rundy sparingowe, serie na
+// siłowni, rozgrzewka + część główna.
 //
 // Struktura z planu:
 //   segmenty: [
 //     { nazwa, czas_min?, dystans_km?, tempo?, strefa_tetna?, zakres_tetna?, opis? },
 //     { powtorzenia: N, czesci: [ segment prosty, ... ] }
 //   ]
-// Bieg ciągły = jeden segment prosty. Interwały = blok z "powtorzenia".
-// Łączny czas liczy aplikacja, nie AI.
+// Ciągły wysiłek = jeden segment prosty. Interwały/rundy = blok z
+// "powtorzenia". Łączny czas liczy aplikacja, nie AI.
 // ---------------------------------------------------------------------
 
 function formatujMinuty(min) {
@@ -130,6 +132,7 @@ function metaSegmentu(segment) {
     const wartosc = segment.zakres_tetna || "—";
     czesci.push(`<span>${etykieta}: <strong>${wartosc}</strong></span>`);
   }
+  if (segment.obciazenie) czesci.push(`<span>Obciążenie: <strong>${segment.obciazenie}</strong></span>`);
   if (!czesci.length) return "";
   return `<div class="segment-meta">${czesci.join("")}</div>`;
 }
@@ -139,7 +142,7 @@ function renderujSegmentProsty(segment) {
   return `
     <li class="segment">
       <div class="segment-glowa">
-        <span class="segment-nazwa">${segment.nazwa || "Bieg"}</span>
+        <span class="segment-nazwa">${segment.nazwa || "Segment"}</span>
         ${miara ? `<span class="segment-miara">${miara}</span>` : ""}
       </div>
       ${metaSegmentu(segment)}
@@ -165,25 +168,8 @@ function renderujBlokPowtarzany(segment) {
   `;
 }
 
-function renderujBieganie(dane) {
-  const segmenty = Array.isArray(dane.segmenty) ? dane.segmenty : null;
-
-  // Stary format planu (bez segmentów) — renderuj jak dotychczas,
-  // żeby wcześniej zaimportowany plan nie przestał nagle działać.
-  if (!segmenty || !segmenty.length) {
-    return `
-      <div class="tile-body">
-        ${dane.opis ? `<p class="opis">${dane.opis}</p>` : ""}
-        <div class="tile-meta">
-          ${dane.tempo ? `<span>Tempo: <strong>${dane.tempo}</strong></span>` : ""}
-          ${dane.zakres_tetna ? `<span>${dane.strefa_tetna || "Tętno"}: <strong>${dane.zakres_tetna}</strong></span>` : ""}
-          ${dane.kalorie ? `<span>Kalorie: <strong>${dane.kalorie} kcal</strong></span>` : ""}
-        </div>
-        <p class="segment-opis">Ten trening pochodzi ze starszego importu — bez rozpisania na segmenty.</p>
-      </div>
-    `;
-  }
-
+function renderujSegmenty(dane) {
+  const segmenty = dane.segmenty;
   const suma = sumaTreningu(segmenty);
   const dystansCalkowity = Number(dane.dystans_km) || suma.km;
   const podsumowanie = miaraTekst(suma.min, dystansCalkowity);
@@ -193,42 +179,60 @@ function renderujBieganie(dane) {
     .join("");
 
   return `
-    <div class="tile-body">
-      ${podsumowanie ? `<p class="bieg-podsumowanie">${podsumowanie}</p>` : ""}
-      ${dane.opis ? `<p class="opis">${dane.opis}</p>` : ""}
-      <ul class="segment-lista">${lista}</ul>
-      ${dane.kalorie ? `<p class="kalorie-info">${dane.kalorie} kcal</p>` : ""}
-    </div>
+    ${podsumowanie ? `<p class="bieg-podsumowanie">${podsumowanie}</p>` : ""}
+    <ul class="segment-lista">${lista}</ul>
   `;
 }
 
-function renderujKafelek(kategoria, planDay, realizacja) {
-  const dane = planDay[kategoria];
+function renderujCwiczenia(dane) {
+  const pozycje = dane.cwiczenia
+    .map(
+      (c) =>
+        `<li><span class="nazwa-cwiczenia">${c.nazwa || ""}</span><span class="ilosc">${c.ilosc || ""}</span></li>`
+    )
+    .join("");
+  return `<ul class="exercise-list">${pozycje}</ul>`;
+}
+
+// Stary format planu (np. bieg zapisany bez segmentów) — pokazujemy to,
+// co jest, zamiast pustego kafelka.
+function renderujMetaStarego(dane) {
+  const czesci = [];
+  if (dane.tempo) czesci.push(`<span>Tempo: <strong>${dane.tempo}</strong></span>`);
+  if (dane.zakres_tetna) {
+    czesci.push(`<span>${dane.strefa_tetna || "Tętno"}: <strong>${dane.zakres_tetna}</strong></span>`);
+  }
+  if (dane.dystans_km) czesci.push(`<span>Dystans: <strong>${formatujKm(dane.dystans_km)}</strong></span>`);
+  if (!czesci.length) return "";
+  return `<div class="tile-meta">${czesci.join("")}</div>`;
+}
+
+function renderujKafelek(kategoria, dane, realizacja) {
   if (!dane) return ""; // brak wpisu = brak treningu tej kategorii tego dnia
 
   const stanCheck = realizacja.kategorie?.[kategoria] ?? "niezrealizowany";
-  let tresc = "";
+  const szczegoly = dane && typeof dane === "object" ? dane : {};
 
-  if (kategoria === "bieganie") {
-    tresc = renderujBieganie(dane);
-  } else if (kategoria === "drazki" || kategoria === "dom") {
-    const pozycje = (dane.cwiczenia || [])
-      .map((c) => `<li><span class="nazwa-cwiczenia">${c.nazwa}</span><span class="ilosc">${c.ilosc}</span></li>`)
-      .join("");
-    tresc = `
-      <ul class="exercise-list">${pozycje}</ul>
-      ${dane.kalorie ? `<p class="kalorie-info">${dane.kalorie} kcal</p>` : ""}
-    `;
-  }
-  // sporty_walki / silownia: tylko checkbox, bez treści — tresc zostaje puste
+  const maSegmenty = Array.isArray(szczegoly.segmenty) && szczegoly.segmenty.length > 0;
+  const maCwiczenia = Array.isArray(szczegoly.cwiczenia) && szczegoly.cwiczenia.length > 0;
+
+  const czesci = [];
+  if (szczegoly.opis) czesci.push(`<p class="opis">${szczegoly.opis}</p>`);
+  if (maSegmenty) czesci.push(renderujSegmenty(szczegoly));
+  if (maCwiczenia) czesci.push(renderujCwiczenia(szczegoly));
+  if (!maSegmenty && !maCwiczenia) czesci.push(renderujMetaStarego(szczegoly));
+  if (szczegoly.kalorie) czesci.push(`<p class="kalorie-info">${szczegoly.kalorie} kcal</p>`);
+
+  const tresc = czesci.filter(Boolean).join("");
+  const nazwa = etykietaKategorii(kategoria);
 
   return `
     <div class="tile">
       <div class="tile-header">
-        <button class="tristate" data-action="tristate" data-category="${kategoria}" data-state="${stanCheck}" aria-label="Stan realizacji: ${kategoria}"></button>
-        <span class="tile-title">${CATEGORY_LABELS[kategoria]}</span>
+        <button class="tristate" data-action="tristate" data-category="${kategoria}" data-state="${stanCheck}" aria-label="Stan realizacji: ${nazwa}"></button>
+        <span class="tile-title">${nazwa}</span>
       </div>
-      ${tresc}
+      ${tresc ? `<div class="tile-body">${tresc}</div>` : ""}
     </div>
   `;
 }
@@ -271,27 +275,17 @@ export function mount(container, dateKey, onZmianaDnia) {
       </div>
     `;
 
-    // Timer przerwy pokazujemy raz, nad pierwszym kafelkiem drążków/domu —
-    // jeśli oba są w planie tego dnia, dzielą jeden wspólny przycisk.
-    const pokazTimer = Boolean(planDay.drazki || planDay.dom);
-    let wstawionoTimer = false;
-
     let glownaTresc;
     if (realizacja.stan_dnia === "normalny") {
-      const kafelki = Object.keys(CATEGORY_LABELS)
-        .map((k) => {
-          const tile = renderujKafelek(k, planDay, realizacja);
-          if (!tile) return "";
-          if (pokazTimer && !wstawionoTimer && (k === "drazki" || k === "dom")) {
-            wstawionoTimer = true;
-            return timerWidget.html() + tile;
-          }
-          return tile;
-        })
+      // Kolejność kafelków = kolejność kluczy w pliku planu.
+      const kafelki = Object.keys(planDay)
+        .map((k) => renderujKafelek(k, planDay[k], realizacja))
         .join("");
+      // Timer jest stałym elementem dnia — nad kafelkami, niezależnie od tego,
+      // jakie kategorie są w planie.
       glownaTresc = kafelki.trim()
-        ? kafelki
-        : `<div class="day-off-message">Brak treningu w planie na ten dzień.</div>`;
+        ? timerWidget.html() + kafelki
+        : timerWidget.html() + `<div class="day-off-message">Brak treningu w planie na ten dzień.</div>`;
     } else {
       const wiadomosc =
         realizacja.stan_dnia === "przerwa"
