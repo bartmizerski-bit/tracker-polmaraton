@@ -930,3 +930,71 @@ body {
 .timer-przerwy.timer-done .timer-czas {
   color: var(--color-ink);
 }
+/* --- Edytor kategorii w Konfiguracji (dopisane) --- */
+.kat-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kat-edycja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: var(--color-ink-light);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+}
+
+.kat-edycja-glowa {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kat-nazwa-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--color-ink);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.kat-usun {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  background: transparent;
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.kat-flaga {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.kat-flaga input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--color-lime);
+}
+
+.kat-id {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
