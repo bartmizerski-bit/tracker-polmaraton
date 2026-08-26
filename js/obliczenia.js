@@ -2,14 +2,14 @@
 // Prawdziwe liczenie statystyk i odblokowań achievementów na podstawie
 // zapisanej realizacji (mockRealizacja / IndexedDB) i planu.
 //
-// UPROSZCZENIE tego kroku: odblokowanie automatycznych achievementów
-// liczy się na żywo przy każdym wejściu w widok, a nie jest zapisywane
-// z datą odblokowania (jak przewiduje docelowy model danych). Wynik
-// widoczny dla użytkownika jest ten sam, ale "data_odblokowania" nie
-// jest jeszcze nigdzie trwale zapisywana — to naturalne rozszerzenie
-// na kolejny krok, jeśli będzie potrzebne (np. do sortowania po dacie).
+// Nic tutaj nie zna nazw kategorii — wszystko liczy się po tym, co
+// faktycznie siedzi w planie i realizacji danego dnia.
+//
+// UPROSZCZENIE: odblokowanie automatycznych achievementów liczy się
+// na żywo przy każdym wejściu w widok, a nie jest zapisywane z datą
+// odblokowania. Wynik widoczny dla użytkownika jest ten sam.
 // ---------------------------------------------------------------------
-import { mockRealizacja, mockPlan, mockProfil, mockWpisyWagi, toKey, addDays } from "./state.js";
+import { mockRealizacja, mockPlan, mockWpisyWagi, toKey, addDays } from "./state.js";
 
 const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu — ta sama stała co w widoku dnia
 
@@ -145,19 +145,26 @@ function ostatniaWaga() {
   return posortowane[posortowane.length - 1].waga_kg;
 }
 
+// Kalorie sumujemy z KAŻDEJ odhaczonej kategorii, która ma pole "kalorie" —
+// bez żadnej listy dozwolonych nazw. Nowa kategoria z planu liczy się od razu.
+export function kalorieZKategorii(planDay, realizacja) {
+  if (!planDay || !realizacja) return 0;
+  return Object.entries(planDay).reduce((suma, [kat, dane]) => {
+    if (!dane || typeof dane !== "object") return suma;
+    const kalorie = Number(dane.kalorie);
+    if (!kalorie) return suma;
+    const stan = realizacja.kategorie?.[kat];
+    if (stan !== "zrealizowany" && stan !== "czesciowo") return suma;
+    return suma + kalorie;
+  }, 0);
+}
+
 function kalorieZaDzien(dateKey) {
   const planDay = mockPlan[dateKey] || {};
   const realizacja = mockRealizacja[dateKey];
   if (!realizacja) return 0;
 
-  let suma = 0;
-  ["bieganie", "drazki", "dom"].forEach((kat) => {
-    const dane = planDay[kat];
-    const stan = realizacja.kategorie?.[kat];
-    if (dane?.kalorie && (stan === "zrealizowany" || stan === "czesciowo")) {
-      suma += dane.kalorie;
-    }
-  });
+  let suma = kalorieZKategorii(planDay, realizacja);
 
   const waga = ostatniaWaga();
   const km = parseFloat(realizacja.km_marsz?.wartosc);
@@ -229,6 +236,10 @@ export function obliczOdblokowaneAchievementy() {
   const sumaKm = obliczSumeKm();
   const sesje = obliczSesje();
 
+  const wartosciSesji = Object.values(sesje);
+  const najmocniejszaKategoria = wartosciSesji.length ? Math.max(...wartosciSesji) : 0;
+  const sesjeLacznie = wartosciSesji.reduce((a, b) => a + b, 0);
+
   return {
     streak_3: najlepszaPassa >= 3,
     streak_7: najlepszaPassa >= 7,
@@ -239,21 +250,10 @@ export function obliczOdblokowaneAchievementy() {
     km_50: sumaKm >= 50,
     km_100: sumaKm >= 100,
     km_250: sumaKm >= 250,
-    sesje_bieganie_10: (sesje.bieganie || 0) >= 10,
-    sesje_drazki_10: (sesje.drazki || 0) >= 10,
+    sesje_kat_10: najmocniejszaKategoria >= 10,
+    sesje_kat_50: najmocniejszaKategoria >= 50,
+    sesje_lacznie_100: sesjeLacznie >= 100,
     powrot_po_przerwie: sprawdzPowrotPoPrzerwie(),
     miesiac_bez_lenia: sprawdzMiesiacBezLenia(),
   };
-}
-
-// --- Przypomnienie o samoocenie postępu (co ~8 tygodni) ---
-const DNI_MIEDZY_OCENAMI = 56;
-
-export function obliczPrzypomnienie() {
-  const ostatnia = mockProfil.ostatnia_ocena_postepu;
-  if (!ostatnia) return { potrzebne: false, dniOd: 0 };
-
-  const dzisiaj = new Date();
-  const dniOd = Math.floor((dzisiaj - new Date(ostatnia)) / (1000 * 60 * 60 * 24));
-  return { potrzebne: dniOd >= DNI_MIEDZY_OCENAMI, dniOd };
 }

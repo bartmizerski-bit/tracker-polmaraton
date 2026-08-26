@@ -4,14 +4,13 @@
 // zapisywane w IndexedDB (patrz inicjalizujStan / funkcje zapiszXxx).
 // Zaczynają jako puste — użytkownik wypełnia je przez Konfigurację
 // i codzienne korzystanie z apki.
+//
+// KATEGORIE: aplikacja nie zna z góry żadnej listy sportów. Kategoria to
+// zwykły klucz tekstowy pochodzący z zaimportowanego planu. Sposób
+// wyświetlania wynika z KSZTAŁTU danych dnia (segmenty / ćwiczenia / nic),
+// a nie z nazwy kategorii — dzięki temu ta sama kategoria może być raz
+// rozpisana na segmenty, a raz jako lista ćwiczeń.
 // ---------------------------------------------------------------------
-
-export const CATEGORY_LABELS = {
-  bieganie: "Bieganie",
-  drazki: "Drążki",
-  dom: "Dom",
-  sporty_walki: "Sporty walki",
-};
 
 export const TRISTATE_ORDER = ["niezrealizowany", "czesciowo", "zrealizowany"];
 
@@ -35,6 +34,7 @@ export function addDays(date, n) {
 }
 
 // --- Plan (pusty na start — wypełnia się przez import w Konfiguracji) ---
+// Klucze to daty "RRRR-MM-DD". Metadane planu NIE trafiają tutaj.
 export const mockPlan = {};
 
 // --- Realizacja (pusta na start) ---
@@ -56,14 +56,78 @@ export function getRealizacja(dateKey) {
   return mockRealizacja[dateKey];
 }
 
+// ---------------------------------------------------------------------
+// Etykiety kategorii
+//
+// Trzy poziomy, w tej kolejności:
+//   1. etykietyKategorii — mapa id → nazwa przysłana w meta.kategorie planu,
+//      gromadzona kumulatywnie między importami (stare wpisy nie znikają),
+//   2. lista kategorii z Konfiguracji (mockProfil.kategorie_wybrane),
+//   3. fallback wyliczony z samego id ("sporty_walki" → "Sporty walki").
+// ---------------------------------------------------------------------
+export const etykietyKategorii = {};
+
+export function domyslnaEtykieta(id) {
+  const tekst = String(id).replace(/_/g, " ").trim();
+  if (!tekst) return String(id);
+  return tekst.charAt(0).toUpperCase() + tekst.slice(1);
+}
+
+export function etykietaKategorii(id) {
+  if (etykietyKategorii[id]) return etykietyKategorii[id];
+  const zProfilu = (mockProfil.kategorie_wybrane || []).find((k) => k.id === id);
+  if (zProfilu && zProfilu.nazwa) return zProfilu.nazwa;
+  return domyslnaEtykieta(id);
+}
+
+// Id kategorii generowane z nazwy wpisanej przez usera w Konfiguracji.
+const POLSKIE_ZNAKI = { ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z" };
+
+export function slugKategorii(nazwa) {
+  return String(nazwa)
+    .toLowerCase()
+    .replace(/[ąćęłńóśźż]/g, (z) => POLSKIE_ZNAKI[z])
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 // --- Profil usera (puste/neutralne wartości na start) ---
+// kategorie_wybrane: [{ id, nazwa, ai_nie_planuje }]
+// ai_nie_planuje = kategoria o stałym grafiku (siłownia, treningi klubowe itp.),
+// której AI nie układa — tylko wstawia dni jej wystąpienia.
 export const mockProfil = {
   wzrost_cm: "",
   wiek: "",
-  kategorie_wybrane: ["bieganie"],
+  kategorie_wybrane: [],
   domyslny_timer_sek: 60,
-  ostatnia_ocena_postepu: toKey(new Date()),
 };
+
+// Kategorie, które w starym modelu miały stały grafik i nie były planowane
+// przez AI — przy migracji dostają flagę ai_nie_planuje.
+const STARE_KATEGORIE_BEZ_PLANOWANIA = new Set(["sporty_walki", "silownia"]);
+
+export function znormalizujKategorie(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((k) => {
+      if (typeof k === "string") {
+        return {
+          id: k,
+          nazwa: domyslnaEtykieta(k),
+          ai_nie_planuje: STARE_KATEGORIE_BEZ_PLANOWANIA.has(k),
+        };
+      }
+      if (k && typeof k === "object" && k.id) {
+        return {
+          id: String(k.id),
+          nazwa: k.nazwa ? String(k.nazwa) : domyslnaEtykieta(k.id),
+          ai_nie_planuje: Boolean(k.ai_nie_planuje),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
 
 // --- Wpisy wagi (puste na start, do BMI) ---
 export const mockWpisyWagi = [];
@@ -74,6 +138,7 @@ export function obliczBMI(wagaKg, wzrostCm) {
 }
 
 // --- Achievementy ---
+// Żaden nie jest przypięty do konkretnego sportu — apka nie zna nazw kategorii.
 export const mockAchievementyAutomatyczne = [
   { id: "streak_3", nazwa: "Rozgrzewka się skończyła", opis: "3 dni z rzędu" },
   { id: "streak_7", nazwa: "Tydzień bez wymówek", opis: "7 dni z rzędu" },
@@ -84,8 +149,9 @@ export const mockAchievementyAutomatyczne = [
   { id: "km_50", nazwa: "Buty już to czują", opis: "50 km marszu sumarycznie" },
   { id: "km_100", nazwa: "Można by dojść do sąsiedniego miasta", opis: "100 km marszu sumarycznie" },
   { id: "km_250", nazwa: "Chodząca ambicja", opis: "250 km marszu sumarycznie" },
-  { id: "sesje_bieganie_10", nazwa: "Dziesięć razy w butach do biegania", opis: "10 sesji biegowych" },
-  { id: "sesje_drazki_10", nazwa: "Dłonie już znają drążek", opis: "10 sesji na drążkach" },
+  { id: "sesje_kat_10", nazwa: "Dziesięć razy to samo", opis: "10 sesji w jednej kategorii" },
+  { id: "sesje_kat_50", nazwa: "Pięćdziesiątka w jednej dyscyplinie", opis: "50 sesji w jednej kategorii" },
+  { id: "sesje_lacznie_100", nazwa: "Setka na liczniku", opis: "100 odhaczonych sesji łącznie" },
   { id: "powrot_po_przerwie", nazwa: "Wróciłeś. Kolana też się zdziwiły", opis: "Powrót zaraz po dniu przerwy" },
   { id: "miesiac_bez_lenia", nazwa: "Ani jednego lenia", opis: "Miesiąc bez dnia oznaczonego jako leń" },
 ];
@@ -122,17 +188,32 @@ import { dbGet, dbSet, dbGetAll, dbClearAll } from "./db.js";
 
 export async function inicjalizujStan() {
   try {
-    const [profil, plan, wpisyWagi, pr, achWlasne, dni] = await Promise.all([
+    const [profil, plan, etykiety, wpisyWagi, pr, achWlasne, dni] = await Promise.all([
       dbGet("meta", "profil"),
       dbGet("meta", "plan"),
+      dbGet("meta", "etykietyKategorii"),
       dbGet("meta", "wpisyWagi"),
       dbGet("meta", "pr"),
       dbGet("meta", "achievementyWlasne"),
       dbGetAll("dni"),
     ]);
 
-    if (profil) Object.assign(mockProfil, profil);
-    if (plan) Object.assign(mockPlan, plan);
+    if (profil) {
+      Object.assign(mockProfil, profil);
+      // Migracja starego formatu: tablica stringów → tablica obiektów.
+      mockProfil.kategorie_wybrane = znormalizujKategorie(mockProfil.kategorie_wybrane);
+      // Pozostałość po modelu faz — już nieużywane.
+      delete mockProfil.ostatnia_ocena_postepu;
+      delete mockProfil.data_polmaratonu;
+      delete mockProfil.data_startu_planu;
+    }
+    if (plan) {
+      Object.assign(mockPlan, plan);
+      // Starsze zapisy mogły trzymać metadane razem z dniami — sprzątamy,
+      // żeby "meta" nie udawało dnia w widoku tygodnia i statystykach.
+      delete mockPlan.meta;
+    }
+    if (etykiety) Object.assign(etykietyKategorii, etykiety);
     if (wpisyWagi) mockWpisyWagi.splice(0, mockWpisyWagi.length, ...wpisyWagi);
     if (pr) Object.assign(mockPR, pr);
     if (achWlasne) mockAchievementyWlasne.splice(0, mockAchievementyWlasne.length, ...achWlasne);
@@ -190,13 +271,22 @@ export async function zapiszPlan() {
   }
 }
 
+export async function zapiszEtykietyKategorii() {
+  try {
+    await dbSet("meta", "etykietyKategorii", etykietyKategorii);
+  } catch (err) {
+    console.warn("Nie udało się zapisać nazw kategorii:", err);
+  }
+}
+
 // --- Backup: eksport/import całej bazy do pliku JSON ---
 export function eksportujDane() {
   return {
-    wersja: 1,
+    wersja: 2,
     eksportowano: new Date().toISOString(),
     profil: mockProfil,
     plan: mockPlan,
+    etykietyKategorii,
     wpisyWagi: mockWpisyWagi,
     pr: mockPR,
     achievementyWlasne: mockAchievementyWlasne,
@@ -209,8 +299,18 @@ export async function importujDane(dane) {
     throw new Error("To nie jest poprawny plik backupu.");
   }
 
-  if (dane.profil) Object.assign(mockProfil, dane.profil);
-  if (dane.plan) Object.assign(mockPlan, dane.plan);
+  if (dane.profil) {
+    Object.assign(mockProfil, dane.profil);
+    mockProfil.kategorie_wybrane = znormalizujKategorie(mockProfil.kategorie_wybrane);
+    delete mockProfil.ostatnia_ocena_postepu;
+    delete mockProfil.data_polmaratonu;
+    delete mockProfil.data_startu_planu;
+  }
+  if (dane.plan) {
+    Object.assign(mockPlan, dane.plan);
+    delete mockPlan.meta;
+  }
+  if (dane.etykietyKategorii) Object.assign(etykietyKategorii, dane.etykietyKategorii);
   if (Array.isArray(dane.wpisyWagi)) mockWpisyWagi.splice(0, mockWpisyWagi.length, ...dane.wpisyWagi);
   if (dane.pr) Object.assign(mockPR, dane.pr);
   if (Array.isArray(dane.achievementyWlasne)) {
@@ -220,6 +320,7 @@ export async function importujDane(dane) {
 
   await zapiszProfil();
   await zapiszPlan();
+  await zapiszEtykietyKategorii();
   await zapiszWpisyWagi();
   await zapiszPR();
   await zapiszAchievementyWlasne();
@@ -236,6 +337,7 @@ export async function wyczyscWszystkieDane() {
 
   for (const klucz of Object.keys(mockPlan)) delete mockPlan[klucz];
   for (const klucz of Object.keys(mockRealizacja)) delete mockRealizacja[klucz];
+  for (const klucz of Object.keys(etykietyKategorii)) delete etykietyKategorii[klucz];
   mockWpisyWagi.splice(0, mockWpisyWagi.length);
   mockAchievementyWlasne.splice(0, mockAchievementyWlasne.length);
   mockPR.czas_1km.wpisy = [];
@@ -245,7 +347,6 @@ export async function wyczyscWszystkieDane() {
 
   mockProfil.wzrost_cm = "";
   mockProfil.wiek = "";
-  mockProfil.kategorie_wybrane = ["bieganie"];
+  mockProfil.kategorie_wybrane = [];
   mockProfil.domyslny_timer_sek = 60;
-  mockProfil.ostatnia_ocena_postepu = toKey(new Date());
 }
