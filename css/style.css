@@ -249,30 +249,6 @@ body {
   white-space: nowrap;
 }
 
-.kalorie-info {
-  margin: 0.3rem 0 0;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.kalorie-dzien {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0 0.2rem;
-}
-
-.kalorie-wartosc {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  color: var(--color-lime);
-}
-
-.kalorie-etykieta {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
 /* Stan dnia zastępujący kafelki (przerwa / leń) */
 .day-off-message {
   background: var(--color-ink-light);
@@ -447,38 +423,6 @@ body {
 
 .stat-label {
   font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-.bar-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  height: 120px;
-  background: var(--color-ink-light);
-  border-radius: 14px;
-  padding: 1rem 0.75rem 0.5rem;
-}
-
-.bar-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  gap: 0.3rem;
-}
-
-.bar {
-  width: 100%;
-  background: var(--color-track-red);
-  border-radius: 4px 4px 0 0;
-  min-height: 3px;
-}
-
-.bar-label {
-  font-size: 0.7rem;
   color: var(--color-text-muted);
 }
 
@@ -869,12 +813,8 @@ body {
   cursor: pointer;
 }
 
-/* Timer przerwy — nad kafelkiem drążków/domu */
+/* Timer przerwy — nad kafelkami w widoku dnia */
 .timer-przerwy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
   background: var(--color-ink-light);
   border: 1.5px solid var(--color-track-red);
   border-radius: 14px;
@@ -883,9 +823,27 @@ body {
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+/* Rząd trzech presetów — startują odliczanie jednym kliknięciem */
+.timer-presety {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.timer-presety[hidden],
+.timer-bieg[hidden] {
+  display: none;
+}
+
+.timer-bieg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .timer-btn {
   flex: 1;
-  padding: 0.55rem 0.75rem;
+  padding: 0.55rem 0.5rem;
   border-radius: 10px;
   border: none;
   background: var(--color-track-red);
@@ -894,7 +852,19 @@ body {
   font-size: 1.1rem;
   letter-spacing: 0.03em;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.1s ease;
+}
+
+.timer-btn:active {
+  transform: scale(0.96);
+}
+
+.timer-btn-przerwij {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1.5px solid var(--color-lime);
+  color: var(--color-lime);
+  padding: 0.4rem 0.9rem;
 }
 
 .timer-czas {
@@ -903,33 +873,29 @@ body {
   letter-spacing: 0.02em;
   color: var(--color-lime);
   min-width: 2.6ch;
-  text-align: right;
 }
 
 .timer-przerwy.timer-running {
   border-color: var(--color-lime);
 }
 
-.timer-przerwy.timer-running .timer-btn {
-  background: transparent;
-  border: 1.5px solid var(--color-lime);
-  color: var(--color-lime);
-  padding: 0.4rem 0.75rem;
-}
-
-.timer-przerwy.timer-done {
+/* Krótki błysk po zakończeniu — potem sam wraca do presetów */
+.timer-przerwy.timer-koniec {
   border-color: var(--color-lime);
   background: var(--color-lime);
+  animation: timer-blysk 0.5s ease-in-out 3;
 }
 
-.timer-przerwy.timer-done .timer-btn {
+.timer-przerwy.timer-koniec .timer-btn {
   background: var(--color-ink);
   color: var(--color-lime);
 }
 
-.timer-przerwy.timer-done .timer-czas {
-  color: var(--color-ink);
+@keyframes timer-blysk {
+  0%, 100% { background: var(--color-lime); }
+  50% { background: var(--color-ink-light); }
 }
+
 /* --- Edytor kategorii w Konfiguracji (dopisane) --- */
 .kat-lista {
   display: flex;
