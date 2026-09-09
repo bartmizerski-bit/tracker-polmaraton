@@ -85,6 +85,34 @@ export function obliczSesje() {
   return liczniki;
 }
 
+// --- Trzymanie michy: osobny streak, niezależny od passy treningowej ---
+export function obliczPasseMichy() {
+  const { start, dzisiaj } = zakresDat();
+  let biezaca = 0;
+  let najdluzsza = 0;
+
+  for (let dzien = start; dzien <= dzisiaj; dzien = addDays(dzien, 1)) {
+    const realizacja = mockRealizacja[toKey(dzien)];
+    if (realizacja && realizacja.trzymanie_michy) {
+      biezaca += 1;
+      if (biezaca > najdluzsza) najdluzsza = biezaca;
+    } else {
+      biezaca = 0;
+    }
+  }
+
+  return { aktualna: biezaca, najdluzsza };
+}
+
+// --- Liczniki dni specjalnych ---
+export function obliczDniPrzerwy() {
+  return Object.values(mockRealizacja).filter((d) => d.stan_dnia === "przerwa").length;
+}
+
+export function obliczDniLen() {
+  return Object.values(mockRealizacja).filter((d) => d.stan_dnia === "len").length;
+}
+
 // --- % zrealizowanych dni z całego planu (od startu do dziś, bez dni przerwy) ---
 export function obliczProcentRealizacjiPlanu() {
   const { start, dzisiaj } = zakresDat();
