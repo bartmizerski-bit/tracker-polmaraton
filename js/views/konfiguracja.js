@@ -11,9 +11,17 @@ import {
   eksportujDane,
   importujDane,
   slugKategorii,
+  znormalizujPresetyTimera,
   toKey,
   addDays,
 } from "../state.js";
+
+// Odczytuje trzy pola presetów timera; puste/bzdurne wartości wracają
+// do domyślnych 30/60/90 zamiast psuć widget w widoku dnia.
+function zbierzPresetyTimera(container) {
+  const wartosci = [0, 1, 2].map((i) => container.querySelector(`#timer-input-${i}`)?.value);
+  return znormalizujPresetyTimera(wartosci);
+}
 
 // Telefony (zwłaszcza iPhone przy wpisywaniu/wklejaniu przez niektóre pola)
 // potrafią podmienić proste cudzysłowy " i ' na "inteligentne" wersje typu
@@ -147,14 +155,12 @@ A) SEGMENTY — trening rozpisany krok po kroku w tablicy "segmenty".
    - Rozgrzewkę i schłodzenie zawsze jako osobne segmenty, nigdy jako wzmiankę w opisie.
    - "opis" treningu to jedno zdanie o CELU (np. "Interwały tempowe pod próg mleczanowy."), bez powtarzania struktury.
    - "dystans_km" na poziomie treningu (opcjonalnie) = łączny dystans. ŁĄCZNEGO CZASU NIE PODAWAJ — aplikacja liczy go sama z segmentów.
-   - "kalorie": szacunek dla całego treningu.
    Formaty sztywne, jeśli podajesz: tempo ZAWSZE "M:SS-M:SS min/km", zakres_tetna ZAWSZE "NNN-NNN bpm".
 
    Przykład dnia z segmentami:
    "bieganie": {
      "opis": "Interwały tempowe.",
      "dystans_km": 8,
-     "kalorie": 380,
      "segmenty": [
        { "nazwa": "Rozgrzewka", "czas_min": 10, "tempo": "6:30-7:00 min/km", "strefa_tetna": "Strefa 2", "zakres_tetna": "125-140 bpm" },
        { "powtorzenia": 6, "czesci": [
@@ -165,14 +171,14 @@ A) SEGMENTY — trening rozpisany krok po kroku w tablicy "segmenty".
      ]
    }
 
-B) LISTA ĆWICZEŃ — tablica "cwiczenia" z obiektami { "nazwa", "ilosc" } + szacowane kalorie.
+B) LISTA ĆWICZEŃ — tablica "cwiczenia" z obiektami { "nazwa", "ilosc" }.
    Stosuj tam, gdzie liczy się zestaw ćwiczeń, a nie oś czasu.
    "ilosc" ma być krótkie i konkretne — sama liczba/zakres i jednostka (np. "8-10 powt.", "3x8", "30 sek."). BEZ dopisków w nawiasach, BEZ komentarzy typu "ile dasz radę", "w każdą stronę", uwag o obecnym poziomie usera itp. Jeśli chcesz dodać kontekst, to wyłącznie w krótkim, osobnym polu "opis" — nie upychaj go w "ilosc".
 
    Przykład:
-   "drazki": { "kalorie": 120, "cwiczenia": [ { "nazwa": "Podciąganie nachwytem", "ilosc": "3x6" }, { "nazwa": "Wisy", "ilosc": "30 sek." } ] }
+   "drazki": { "cwiczenia": [ { "nazwa": "Podciąganie nachwytem", "ilosc": "3x6" }, { "nazwa": "Wisy", "ilosc": "30 sek." } ] }
 
-C) SAMO POTWIERDZENIE — wartość true, bez opisu i bez kalorii.
+C) SAMO POTWIERDZENIE — wartość true, bez opisu.
    Stosuj dla kategorii, których nie układasz — user wie, co robi, aplikacja ma tylko dać checkbox.
 
    Przykład: "silownia": true
@@ -368,6 +374,7 @@ export function mount(container, wroc) {
 
   function renderKrok1() {
     const ostatniaWaga = mockWpisyWagi.length ? mockWpisyWagi[mockWpisyWagi.length - 1].waga_kg : "";
+    const presetyTimera = znormalizujPresetyTimera(mockProfil.timer_presety_sek);
 
     container.innerHTML = `
       <button class="cofnij-btn" data-action="wroc">‹ Więcej</button>
@@ -400,11 +407,21 @@ export function mount(container, wroc) {
       <div class="sekcja-naglowek">Timer przerwy</div>
       <div class="fixed-row">
         <div class="fixed-item">
-          <label>Domyślna długość (sek.)</label>
-          <input type="number" step="1" min="1" class="km-input" id="timer-input" value="${mockProfil.domyslny_timer_sek}" />
+          <label>Preset 1 (sek.)</label>
+          <input type="number" step="1" min="1" class="km-input" id="timer-input-0" value="${presetyTimera[0]}" />
+        </div>
+        <div class="fixed-divider"></div>
+        <div class="fixed-item">
+          <label>Preset 2 (sek.)</label>
+          <input type="number" step="1" min="1" class="km-input" id="timer-input-1" value="${presetyTimera[1]}" />
+        </div>
+        <div class="fixed-divider"></div>
+        <div class="fixed-item">
+          <label>Preset 3 (sek.)</label>
+          <input type="number" step="1" min="1" class="km-input" id="timer-input-2" value="${presetyTimera[2]}" />
         </div>
       </div>
-      <p class="opis-sekcji">Widoczny nad kafelkami w każdym dniu, niezależnie od kategorii.</p>
+      <p class="opis-sekcji">Trzy przyciski nad kafelkami w każdym dniu — odliczanie startuje jednym kliknięciem, bez wchodzenia tutaj.</p>
 
       <button class="dodaj-btn" data-action="dalej">Generuj instrukcję dla AI</button>
       <div id="krok1-komunikat"></div>
@@ -473,11 +490,12 @@ export function mount(container, wroc) {
 
     container.querySelector("[data-action='eksportuj']").onclick = eksportuj;
 
-    container.querySelector("#timer-input").onchange = (e) => {
-      const timerSek = Number(e.target.value);
-      mockProfil.domyslny_timer_sek = timerSek > 0 ? timerSek : 60;
-      zapiszProfil();
-    };
+    container.querySelectorAll("[id^='timer-input-']").forEach((input) => {
+      input.onchange = () => {
+        mockProfil.timer_presety_sek = zbierzPresetyTimera(container);
+        zapiszProfil();
+      };
+    });
 
     container.querySelector("[data-action='importuj-wybierz']").onclick = () => {
       container.querySelector("#import-plik").click();
@@ -510,8 +528,7 @@ export function mount(container, wroc) {
       mockProfil.wzrost_cm = Number(container.querySelector("#wzrost-input").value);
       mockProfil.wiek = Number(container.querySelector("#wiek-input").value);
 
-      const timerSek = Number(container.querySelector("#timer-input").value);
-      mockProfil.domyslny_timer_sek = timerSek > 0 ? timerSek : 60;
+      mockProfil.timer_presety_sek = zbierzPresetyTimera(container);
 
       const waga = parseFloat(container.querySelector("#waga-input").value);
       if (waga) {

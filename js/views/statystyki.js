@@ -4,11 +4,9 @@ import {
   obliczPasse,
   obliczSumeKm,
   obliczSesje,
-  obliczRealizacjeTygodni,
   obliczPasseMichy,
   obliczDniPrzerwy,
   obliczDniLen,
-  obliczSumeKalorii,
   obliczProcentRealizacjiPlanu,
 } from "../obliczenia.js";
 import { etykietaKategorii } from "../state.js";
@@ -17,23 +15,10 @@ export function mount(container) {
   const { aktualna, najdluzsza } = obliczPasse();
   const sumaKm = obliczSumeKm();
   const sesje = obliczSesje();
-  const realizacjaTygodni = obliczRealizacjeTygodni(8);
   const passaMichy = obliczPasseMichy();
   const dniPrzerwy = obliczDniPrzerwy();
   const dniLen = obliczDniLen();
-  const sumaKalorii = obliczSumeKalorii();
   const procentRealizacji = obliczProcentRealizacjiPlanu();
-
-  const paski = realizacjaTygodni
-    .map(
-      (proc, i) => `
-      <div class="bar-col">
-        <div class="bar" style="height:${Math.max(proc, 2)}%"></div>
-        <span class="bar-label">${i + 1}</span>
-      </div>
-    `
-    )
-    .join("");
 
   const wpisySesji = Object.entries(sesje).sort((a, b) => b[1] - a[1]);
   const sesjeHtml = wpisySesji.length
@@ -73,11 +58,6 @@ export function mount(container) {
       <span class="stat-label">Suma marszu</span>
     </div>
 
-    <div class="stat-card szeroki">
-      <span class="stat-value">${sumaKalorii} kcal</span>
-      <span class="stat-label">Suma spalonych kalorii</span>
-    </div>
-
     <div class="sekcja-naglowek">Sesje</div>
     <div class="stat-grid">${sesjeHtml}</div>
 
@@ -104,8 +84,5 @@ export function mount(container) {
         <span class="stat-label">Dni lenia</span>
       </div>
     </div>
-
-    <div class="sekcja-naglowek">Realizacja planu — ostatnie 8 tygodni</div>
-    <div class="bar-chart">${paski}</div>
   `;
 }

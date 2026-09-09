@@ -14,15 +14,11 @@ import {
   getPlanDay,
   getRealizacja,
   zapiszRealizacje,
-  mockWpisyWagi,
   mockProfil,
   toKey,
   addDays,
 } from "../state.js";
-import { kalorieZKategorii } from "../obliczenia.js";
 import { createTimerWidget } from "../timer.js";
-
-const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu
 
 // Gest przesunięcia dnia
 const PROG_SWIPE = 50; // minimalny dystans poziomy w px
@@ -33,22 +29,6 @@ const STREFA_KRAWEDZI = 30; // margines ekranu ignorowany (gest cofania w Safari
 function przesunKlucz(dateKey, n) {
   const [rok, mies, dzien] = dateKey.split("-").map(Number);
   return toKey(addDays(new Date(rok, mies - 1, dzien), n));
-}
-
-function ostatniaWaga() {
-  if (!mockWpisyWagi.length) return null;
-  const posortowane = [...mockWpisyWagi].sort((a, b) => (a.data > b.data ? 1 : -1));
-  return posortowane[posortowane.length - 1].waga_kg;
-}
-
-function kalorieMarszu(km) {
-  const waga = ostatniaWaga();
-  if (!waga || !km || isNaN(km)) return 0;
-  return Math.round(km * waga * KCAL_NA_KG_NA_KM);
-}
-
-function kalorieDnia(planDay, realizacja) {
-  return kalorieZKategorii(planDay, realizacja) + kalorieMarszu(parseFloat(realizacja.km_marsz.wartosc));
 }
 
 function formatujDate(dateKey) {
@@ -221,7 +201,6 @@ function renderujKafelek(kategoria, dane, realizacja) {
   if (maSegmenty) czesci.push(renderujSegmenty(szczegoly));
   if (maCwiczenia) czesci.push(renderujCwiczenia(szczegoly));
   if (!maSegmenty && !maCwiczenia) czesci.push(renderujMetaStarego(szczegoly));
-  if (szczegoly.kalorie) czesci.push(`<p class="kalorie-info">${szczegoly.kalorie} kcal</p>`);
 
   const tresc = czesci.filter(Boolean).join("");
   const nazwa = etykietaKategorii(kategoria);
@@ -242,7 +221,7 @@ function renderujKafelek(kategoria, dane, realizacja) {
 export function mount(container, dateKey, onZmianaDnia) {
   const planDay = getPlanDay(dateKey);
   const realizacja = getRealizacja(dateKey);
-  const timerWidget = createTimerWidget(() => mockProfil.domyslny_timer_sek);
+  const timerWidget = createTimerWidget(() => mockProfil.timer_presety_sek);
 
   function render() {
     const daystateButtons = `
@@ -265,13 +244,6 @@ export function mount(container, dateKey, onZmianaDnia) {
           <button class="checkbox-binary ${realizacja.trzymanie_michy ? "checked" : ""}"
                   data-action="trzymanie-michy" aria-label="Trzymanie michy"></button>
         </div>
-      </div>
-    `;
-
-    const kalorieCard = `
-      <div class="kalorie-dzien">
-        <span class="kalorie-wartosc">${kalorieDnia(planDay, realizacja)}</span>
-        <span class="kalorie-etykieta">kcal dziś</span>
       </div>
     `;
 
@@ -302,7 +274,6 @@ export function mount(container, dateKey, onZmianaDnia) {
         </div>
         ${daystateButtons}
         ${fixedRow}
-        ${kalorieCard}
         ${glownaTresc}
       </div>
     `;
