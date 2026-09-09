@@ -99,8 +99,20 @@ export const mockProfil = {
   wzrost_cm: "",
   wiek: "",
   kategorie_wybrane: [],
-  domyslny_timer_sek: 60,
+  // Trzy długości przerwy dostępne jednym kliknięciem w widoku dnia.
+  timer_presety_sek: [30, 60, 90],
 };
+
+export const TIMER_PRESETY_DOMYSLNE = [30, 60, 90];
+
+// Sanityzacja presetów timera — zawsze trzy dodatnie liczby całkowite.
+export function znormalizujPresetyTimera(lista) {
+  const zrodlo = Array.isArray(lista) ? lista : [];
+  return TIMER_PRESETY_DOMYSLNE.map((domyslna, i) => {
+    const n = Math.round(Number(zrodlo[i]));
+    return Number.isFinite(n) && n > 0 ? n : domyslna;
+  });
+}
 
 // Kategorie, które w starym modelu miały stały grafik i nie były planowane
 // przez AI — przy migracji dostają flagę ai_nie_planuje.
@@ -206,6 +218,9 @@ export async function inicjalizujStan() {
       delete mockProfil.ostatnia_ocena_postepu;
       delete mockProfil.data_polmaratonu;
       delete mockProfil.data_startu_planu;
+      // Migracja: jedna domyślna długość timera → trzy presety.
+      mockProfil.timer_presety_sek = znormalizujPresetyTimera(mockProfil.timer_presety_sek);
+      delete mockProfil.domyslny_timer_sek;
     }
     if (plan) {
       Object.assign(mockPlan, plan);
@@ -305,6 +320,8 @@ export async function importujDane(dane) {
     delete mockProfil.ostatnia_ocena_postepu;
     delete mockProfil.data_polmaratonu;
     delete mockProfil.data_startu_planu;
+    mockProfil.timer_presety_sek = znormalizujPresetyTimera(mockProfil.timer_presety_sek);
+    delete mockProfil.domyslny_timer_sek;
   }
   if (dane.plan) {
     Object.assign(mockPlan, dane.plan);
@@ -348,5 +365,5 @@ export async function wyczyscWszystkieDane() {
   mockProfil.wzrost_cm = "";
   mockProfil.wiek = "";
   mockProfil.kategorie_wybrane = [];
-  mockProfil.domyslny_timer_sek = 60;
+  mockProfil.timer_presety_sek = [...TIMER_PRESETY_DOMYSLNE];
 }

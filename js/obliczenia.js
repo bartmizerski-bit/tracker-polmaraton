@@ -9,9 +9,8 @@
 // na żywo przy każdym wejściu w widok, a nie jest zapisywane z datą
 // odblokowania. Wynik widoczny dla użytkownika jest ten sam.
 // ---------------------------------------------------------------------
-import { mockRealizacja, mockPlan, mockWpisyWagi, toKey, addDays } from "./state.js";
+import { mockRealizacja, mockPlan, toKey, addDays } from "./state.js";
 
-const KCAL_NA_KG_NA_KM = 0.9; // przybliżony koszt energetyczny marszu — ta sama stała co w widoku dnia
 
 function dzienZrealizowany(dateKey) {
   const realizacja = mockRealizacja[dateKey];
@@ -84,99 +83,6 @@ export function obliczSesje() {
     });
   });
   return liczniki;
-}
-
-export function obliczRealizacjeTygodni(liczbaTygodni = 8) {
-  const { dzisiaj } = zakresDat();
-  const wyniki = [];
-
-  for (let i = liczbaTygodni - 1; i >= 0; i--) {
-    const koniecOkna = addDays(dzisiaj, -7 * i);
-    let sukcesy = 0;
-    let mianownik = 0;
-
-    for (let cofniecie = 6; cofniecie >= 0; cofniecie--) {
-      const dzien = addDays(koniecOkna, -cofniecie);
-      if (dzien > dzisiaj) continue;
-      const wynik = dzienZrealizowany(toKey(dzien));
-      if (wynik === "neutralny") continue;
-      mianownik += 1;
-      if (wynik === "sukces") sukcesy += 1;
-    }
-
-    wyniki.push(mianownik ? Math.round((sukcesy / mianownik) * 100) : 0);
-  }
-
-  return wyniki;
-}
-
-// --- Trzymanie michy: osobny streak, niezależny od passy treningowej ---
-export function obliczPasseMichy() {
-  const { start, dzisiaj } = zakresDat();
-  let biezaca = 0;
-  let najdluzsza = 0;
-
-  for (let dzien = start; dzien <= dzisiaj; dzien = addDays(dzien, 1)) {
-    const realizacja = mockRealizacja[toKey(dzien)];
-    if (realizacja && realizacja.trzymanie_michy) {
-      biezaca += 1;
-      if (biezaca > najdluzsza) najdluzsza = biezaca;
-    } else {
-      biezaca = 0;
-    }
-  }
-
-  return { aktualna: biezaca, najdluzsza };
-}
-
-// --- Liczniki dni specjalnych ---
-export function obliczDniPrzerwy() {
-  return Object.values(mockRealizacja).filter((d) => d.stan_dnia === "przerwa").length;
-}
-
-export function obliczDniLen() {
-  return Object.values(mockRealizacja).filter((d) => d.stan_dnia === "len").length;
-}
-
-// --- Suma spalonych kalorii (aktywność z planu + marsz) ---
-function ostatniaWaga() {
-  if (!mockWpisyWagi.length) return null;
-  const posortowane = [...mockWpisyWagi].sort((a, b) => (a.data > b.data ? 1 : -1));
-  return posortowane[posortowane.length - 1].waga_kg;
-}
-
-// Kalorie sumujemy z KAŻDEJ odhaczonej kategorii, która ma pole "kalorie" —
-// bez żadnej listy dozwolonych nazw. Nowa kategoria z planu liczy się od razu.
-export function kalorieZKategorii(planDay, realizacja) {
-  if (!planDay || !realizacja) return 0;
-  return Object.entries(planDay).reduce((suma, [kat, dane]) => {
-    if (!dane || typeof dane !== "object") return suma;
-    const kalorie = Number(dane.kalorie);
-    if (!kalorie) return suma;
-    const stan = realizacja.kategorie?.[kat];
-    if (stan !== "zrealizowany" && stan !== "czesciowo") return suma;
-    return suma + kalorie;
-  }, 0);
-}
-
-function kalorieZaDzien(dateKey) {
-  const planDay = mockPlan[dateKey] || {};
-  const realizacja = mockRealizacja[dateKey];
-  if (!realizacja) return 0;
-
-  let suma = kalorieZKategorii(planDay, realizacja);
-
-  const waga = ostatniaWaga();
-  const km = parseFloat(realizacja.km_marsz?.wartosc);
-  if (waga && km && !isNaN(km)) {
-    suma += Math.round(km * waga * KCAL_NA_KG_NA_KM);
-  }
-
-  return suma;
-}
-
-export function obliczSumeKalorii() {
-  return Object.keys(mockRealizacja).reduce((suma, dateKey) => suma + kalorieZaDzien(dateKey), 0);
 }
 
 // --- % zrealizowanych dni z całego planu (od startu do dziś, bez dni przerwy) ---
