@@ -19,6 +19,7 @@ import {
   addDays,
 } from "../state.js";
 import { createTimerWidget } from "../timer.js";
+import { metronomWidget } from "../metronom.js";
 
 // Gest przesunięcia dnia
 const PROG_SWIPE = 50; // minimalny dystans poziomy w px
@@ -255,9 +256,10 @@ export function mount(container, dateKey, onZmianaDnia) {
         .join("");
       // Timer jest stałym elementem dnia — nad kafelkami, niezależnie od tego,
       // jakie kategorie są w planie.
+      const narzedzia = timerWidget.html() + metronomWidget.html();
       glownaTresc = kafelki.trim()
-        ? timerWidget.html() + kafelki
-        : timerWidget.html() + `<div class="day-off-message">Brak treningu w planie na ten dzień.</div>`;
+        ? narzedzia + kafelki
+        : narzedzia + `<div class="day-off-message">Brak treningu w planie na ten dzień.</div>`;
     } else {
       const wiadomosc =
         realizacja.stan_dnia === "przerwa"
@@ -279,6 +281,7 @@ export function mount(container, dateKey, onZmianaDnia) {
     `;
 
     timerWidget.attach(container);
+    metronomWidget.attach(container);
   }
 
   container.onclick = (event) => {
