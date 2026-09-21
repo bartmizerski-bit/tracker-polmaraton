@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Test podtrzymania audio</title>
+<style>
+  body { margin: 0 auto; padding: 1rem; background: #0d0d1a; color: #f4f4f4;
+         font-family: system-ui, sans-serif; max-width: 480px; }
+  h1 { font-size: 1.2rem; }
+  p { color: #9a9aa8; font-size: 0.9rem; }
+  button { display: block; width: 100%; margin: 0.5rem 0; padding: 0.8rem; border-radius: 10px;
+           background: #16162a; border: 1.5px solid #b6ff3c; color: #b6ff3c;
+           font-size: 1rem; font-weight: 600; text-align: left; }
+  button small { display: block; color: #9a9aa8; font-weight: 400; margin-top: 0.2rem; }
+  #stop { border-color: #d81e2c; color: #f4f4f4; background: #d81e2c; text-align: center; }
+  #status { padding: 0.8rem; border-radius: 10px; background: #16162a; margin: 0.8rem 0;
+            font-variant-numeric: tabular-nums; white-space: pre-line; }
+  .ok { color: #b6ff3c; } .zle { color: #ff6b6b; }
+</style>
+</head>
+<body>
+<h1>Test podtrzymania audio</h1>
+<p>Kliknij wariant, od razu zablokuj telefon przyciskiem i odczekaj 90 s,
+nie ruszając go. Potem odblokuj — strona pokaże, czy zegar audio stał.</p>
+<div id="status">Nic nie działa.</div>
+<div id="lista"></div>
+<button id="stop" type="button">Stop</button>
+
+<script>
+  const DLUGOSC = 90;
+  let ctx = null;
+  let aktywny = null; // { id, startData, startAudio, zatrzymaj }
+  let wynikiWariantow = {};
+
+  function audio() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+
+  // Ten sam gong co w aplikacji.
+  function gong(t0) {
+    const out = ctx.createGain(); out.gain.value = 0.45; out.connect(ctx.destination);
+    [[0, 880], [0.3, 1175], [0.6, 1568]].forEach(([dt, f]) => {
+      const s = t0 + dt;
+      const env = ctx.createGain(); env.connect(out);
+      env.gain.setValueAtTime(0.0001, s);
+      env.gain.exponentialRampToValueAtTime(1, s + 0.015);
+      env.gain.exponentialRampToValueAtTime(0.0001, s + 0.9);
+      [[f, 1], [f * 2, 0.25]].forEach(([ff, a]) => {
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.frequency.value = ff; g.gain.value = a;
+        o.connect(g); g.connect(env); o.start(s); o.stop(s + 0.95);
+      });
+    });
+    return out;
+  }
+
+  function sinus(freq, poziom) {
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.frequency.value = freq; g.gain.value = poziom;
+    o.connect(g); g.connect(ctx.destination); o.start();
+    return () => { try { o.stop(); o.disconnect(); g.disconnect(); } catch (e) {} };
+  }
+
+  // Kopia logiki metronomu: kliknięcia planowane z wyprzedzeniem.
+  function kliki(poziom, odstep) {
+    const out = ctx.createGain(); out.gain.value = poziom; out.connect(ctx.destination);
+    let nast = ctx.currentTime + 0.05;
+    const planuj = () => {
+      const teraz = ctx.currentTime;
+      if (nast < teraz) nast = teraz + 0.05;
+      const hor = teraz + (document.hidden ? 2.5 : 0.15);
+      while (nast < hor) {
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.frequency.value = 1200;
+        g.gain.setValueAtTime(0.0001, nast);
+        g.gain.exponentialRampToValueAtTime(1, nast + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.0001, nast + 0.035);
+        o.connect(g); g.connect(out); o.start(nast); o.stop(nast + 0.05);
+        nast += odstep;
+      }
+    };
+    planuj();
+    const id = setInterval(planuj, 50);
+    document.addEventListener("visibilitychange", planuj);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", planuj);
+      try { out.disconnect(); } catch (e) {}
+    };
+  }
+
+  const warianty = [
+    { id: "A", opis: "Sinus 40 Hz, poziom 0.003 (obecny w aplikacji)", start: () => sinus(40, 0.003) },
+    { id: "B", opis: "Sinus 40 Hz, poziom 0.03 (10× głośniej)", start: () => sinus(40, 0.03) },
+    { id: "C", opis: "Sinus 1 kHz, poziom 0.001 (na granicy słyszalności)", start: () => sinus(1000, 0.001) },
+    { id: "D", opis: "Ciche kliknięcia jak metronom na minimum", start: () => kliki(0.0025, 60 / 170) },
+  ];
+
+  function stop() {
+    if (!aktywny) return;
+    aktywny.zatrzymaj();
+    aktywny = null;
+  }
+
+  function start(w) {
+    stop();
+    audio();
+    const zatrzymajSygnal = w.start();
+    const gongOut = gong(ctx.currentTime + DLUGOSC);
+    aktywny = {
+      id: w.id,
+      startData: Date.now(),
+      startAudio: ctx.currentTime,
+      zatrzymaj: () => { zatrzymajSygnal(); try { gongOut.disconnect(); } catch (e) {} },
+    };
+  }
+
+  // Pomiar: ile zegar audio "zgubił" względem zegara systemowego.
+  // Jeśli kontekst był wstrzymany przy zgaszonym ekranie, różnica rośnie.
+  function odswiez() {
+    const el = document.getElementById("status");
+    let tekst = "";
+    if (aktywny) {
+      const realnie = (Date.now() - aktywny.startData) / 1000;
+      const audioT = ctx.currentTime - aktywny.startAudio;
+      const strata = realnie - audioT;
+      const zostalo = Math.max(0, DLUGOSC - realnie);
+      if (strata > 1) wynikiWariantow[aktywny.id] = Math.max(wynikiWariantow[aktywny.id] || 0, strata);
+      else if (realnie > DLUGOSC && !(aktywny.id in wynikiWariantow)) wynikiWariantow[aktywny.id] = 0;
+      tekst += `Wariant ${aktywny.id} — do gongu: ${zostalo.toFixed(0)} s\n` +
+               `Zegar audio w tyle o: ${strata.toFixed(1)} s\n`;
+      if (realnie > DLUGOSC + 3) stop();
+    } else {
+      tekst += "Nic nie działa.\n";
+    }
+    const wyniki = Object.entries(wynikiWariantow)
+      .map(([id, s]) => s > 1
+        ? `<span class="zle">${id}: NIE — zegar audio stał ~${s.toFixed(0)} s</span>`
+        : `<span class="ok">${id}: OK — zegar audio nie stanął</span>`)
+      .join("\n");
+    el.innerHTML = tekst.replace(/\n/g, "<br>") + (wyniki ? "<br><b>Wyniki:</b><br>" + wyniki.replace(/\n/g, "<br>") : "");
+  }
+
+  const lista = document.getElementById("lista");
+  warianty.forEach((w) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `Wariant ${w.id}<small>${w.opis}</small>`;
+    b.onclick = () => start(w);
+    lista.appendChild(b);
+  });
+  document.getElementById("stop").onclick = stop;
+  setInterval(odswiez, 250);
+  document.addEventListener("visibilitychange", odswiez);
+</script>
+</body>
+</html>
