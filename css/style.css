@@ -896,6 +896,92 @@ body {
   50% { background: var(--color-ink-light); }
 }
 
+/* Metronom — pod timerem przerwy */
+.metronom {
+  background: var(--color-ink-light);
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 14px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition: border-color 0.2s ease;
+}
+
+.metronom.metronom-gra {
+  border-color: var(--color-lime);
+}
+
+.metronom-wiersz {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.metronom-toggle {
+  flex: 1;
+  padding: 0.5rem 0.5rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-lime);
+  background: transparent;
+  color: var(--color-lime);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.metronom-gra .metronom-toggle {
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+.metronom-krok {
+  flex: 0 0 2.4rem;
+  height: 2.4rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.metronom-toggle:active,
+.metronom-krok:active {
+  transform: scale(0.96);
+}
+
+.metronom-bpm {
+  width: 3.6rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-text-muted);
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.metronom-bpm::-webkit-outer-spin-button,
+.metronom-bpm::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.metronom-jedn {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.metronom-glosnosc {
+  width: 100%;
+  accent-color: var(--color-lime);
+}
+
 /* --- Edytor kategorii w Konfiguracji (dopisane) --- */
 .kat-lista {
   display: flex;
