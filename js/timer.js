@@ -1,3 +1,5 @@
+import { pobierzAudio } from "./audio.js";
+
 // Widget timera przerwy — montowany nad kafelkami w widoku dnia.
 // Stan (odliczanie) trzymany jest w domknięciu, niezależnie od DOM, dzięki
 // czemu przeżywa wielokrotne re-rendery widoku dnia (dzien.js podmienia całe
@@ -14,82 +16,53 @@ function formatujCzas(sek) {
 }
 
 // --- Dźwięk ---------------------------------------------------------------
-// AudioContext tworzymy w geście usera (klik "start"), nie dopiero na końcu
-// odliczania — inaczej iOS potrafi zablokować albo wyciszyć odtwarzanie.
-// audioSession "playback" sprawia, że przełącznik ciszy na iPhonie nie zabija
-// sygnału (iOS 16.4+; gdzie indziej po prostu nie istnieje).
+// Sygnał końca planujemy w ZEGARZE AUDIO już w momencie startu
+// (osc.start(czasKonca)), a nie wywołujemy z JS po upływie czasu. Android
+// usypia JavaScript przy zgaszonym ekranie, ale wątek audio gra dalej —
+// dlatego sygnał odzywa się punktualnie także przy zablokowanym telefonie.
 
-let ctx = null;
+// Łagodny, trzytonowy gong: czyste sinusy + słaba oktawa dla słyszalności,
+// miękkie wejście i wybrzmienie. Zwraca węzeł wyjściowy — jego odłączenie
+// anuluje zaplanowany (jeszcze niezagrany) sygnał.
+function zaplanujGong(ctx, t0) {
+  const wyjscie = ctx.createGain();
+  wyjscie.gain.value = 0.45;
+  wyjscie.connect(ctx.destination);
 
-function przygotujAudio() {
-  try {
-    if (navigator.audioSession) navigator.audioSession.type = "playback";
-  } catch (err) {
-    // starsze iOS / inne przeglądarki — ignorujemy
-  }
-  try {
-    if (!ctx) {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      ctx = new Ctx();
-    }
-    if (ctx.state === "suspended") ctx.resume();
-  } catch (err) {
-    ctx = null;
-  }
-}
+  const ton = (start, freq) => {
+    const obwiednia = ctx.createGain();
+    obwiednia.connect(wyjscie);
+    obwiednia.gain.setValueAtTime(0.0001, start);
+    obwiednia.gain.exponentialRampToValueAtTime(1, start + 0.015);
+    obwiednia.gain.exponentialRampToValueAtTime(0.0001, start + 0.9);
 
-// Seria ostrych piknięć. Fala "square" i okolice 2.5-3 kHz są słyszalnie
-// głośniejsze od czystego sinusa przy tej samej amplitudzie — tam ucho jest
-// najczulsze. Kompresor podbija poziom bez trzeszczenia.
-function zagrajDzwiek() {
-  try {
-    przygotujAudio();
-    if (!ctx) return;
+    [
+      [freq, 1],
+      [freq * 2, 0.25],
+    ].forEach(([f, amp]) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = f;
+      g.gain.value = amp;
+      osc.connect(g);
+      g.connect(obwiednia);
+      osc.start(start);
+      osc.stop(start + 0.95);
+    });
+  };
 
-    const komp = ctx.createDynamicsCompressor();
-    komp.threshold.value = -18;
-    komp.ratio.value = 12;
-    komp.connect(ctx.destination);
-
-    const master = ctx.createGain();
-    master.gain.value = 0.9;
-    master.connect(komp);
-
-    const pik = (start, dlugosc, freq) => {
-      const gain = ctx.createGain();
-      gain.connect(master);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(1, start + 0.008);
-      gain.gain.setValueAtTime(1, start + dlugosc - 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + dlugosc);
-
-      // Dwa lekko rozstrojone oscylatory — dudnienie dodaje słyszalności.
-      [freq, freq * 1.005].forEach((f) => {
-        const osc = ctx.createOscillator();
-        osc.type = "square";
-        osc.frequency.value = f;
-        osc.connect(gain);
-        osc.start(start);
-        osc.stop(start + dlugosc + 0.02);
-      });
-    };
-
-    const t0 = ctx.currentTime + 0.02;
-    pik(t0, 0.14, 2600);
-    pik(t0 + 0.2, 0.14, 3100);
-    pik(t0 + 0.4, 0.14, 2600);
-    pik(t0 + 0.6, 0.3, 3100);
-  } catch (err) {
-    // Brak wsparcia Web Audio API — trudno, cisza. Wibracja i tak zadziała.
-  }
+  ton(t0, 880);
+  ton(t0 + 0.3, 1175);
+  ton(t0 + 0.6, 1568);
+  return wyjscie;
 }
 
 // Uwaga: Safari na iOS nie wspiera navigator.vibrate w ogóle — ani w
 // przeglądarce, ani w PWA. Na Androidzie zadziała.
 function zawibruj() {
   try {
-    navigator.vibrate?.([400, 150, 400, 150, 600]);
+    navigator.vibrate?.([300, 150, 300]);
   } catch (err) {
     // brak wsparcia — ignorujemy
   }
@@ -108,6 +81,8 @@ export function createTimerWidget(pobierzPresety) {
   let intervalId = null;
   let timeoutKoniec = null;
   let container = null;
+  // Sygnał zaplanowany w zegarze audio: { ctx, czasAudio, wyjscie }
+  let gong = null;
 
   function presety() {
     const lista = pobierzPresety?.();
@@ -155,13 +130,31 @@ export function createTimerWidget(pobierzPresety) {
     odswiez();
   }
 
+  function anulujGong() {
+    if (!gong) return;
+    try {
+      gong.wyjscie.disconnect();
+    } catch (err) {
+      // już odłączony — ignorujemy
+    }
+    gong = null;
+  }
+
   function zakoncz() {
     zatrzymajInterval();
     document.removeEventListener("visibilitychange", naPowrocie);
     status = "koniec";
     pozostaloSek = 0;
     zawibruj();
-    zagrajDzwiek();
+    // Jeśli zegar audio stał (np. kontekst wstrzymany przez system w tle),
+    // zaplanowany gong jeszcze nie zagrał — gramy go od razu. Jeśli zagrał
+    // albo właśnie gra, nic nie dublujemy.
+    if (gong && gong.ctx.currentTime < gong.czasAudio - 0.3) {
+      const ctx = gong.ctx;
+      anulujGong();
+      zaplanujGong(ctx, ctx.currentTime + 0.05);
+    }
+    gong = null;
     odswiez();
     // Po chwili wracamy do rzędu presetów — bez dodatkowego klikania.
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
@@ -175,9 +168,19 @@ export function createTimerWidget(pobierzPresety) {
   function start(sek) {
     zatrzymajInterval();
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
-    przygotujAudio(); // odblokowanie audio w geście usera
+    anulujGong();
     const dlugosc = Math.max(1, Math.round(Number(sek) || 60));
     koniecTs = Date.now() + dlugosc * 1000;
+    // Kontekst tworzony w geście usera; gong od razu wpięty w oś czasu audio.
+    const ctx = pobierzAudio();
+    if (ctx) {
+      try {
+        const czasAudio = ctx.currentTime + dlugosc;
+        gong = { ctx, czasAudio, wyjscie: zaplanujGong(ctx, czasAudio) };
+      } catch (err) {
+        gong = null;
+      }
+    }
     pozostaloSek = dlugosc;
     status = "running";
     document.addEventListener("visibilitychange", naPowrocie);
@@ -188,6 +191,7 @@ export function createTimerWidget(pobierzPresety) {
 
   function przerwij() {
     zatrzymajInterval();
+    anulujGong();
     document.removeEventListener("visibilitychange", naPowrocie);
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
     status = "idle";
