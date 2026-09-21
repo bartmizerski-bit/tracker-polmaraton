@@ -58,6 +58,32 @@ function zaplanujGong(ctx, t0) {
   return wyjscie;
 }
 
+// Podtrzymanie audio na czas odliczania. Chrome na Androidzie przy
+// zgaszonym ekranie wstrzymuje CICHY kontekst audio — wtedy staje też zegar
+// audio i zaplanowany gong czeka do odblokowania. Bardzo cichy sinus 40 Hz
+// (~-50 dBFS) jest dla przeglądarki "dźwiękiem", a dla ucha praktycznie
+// niesłyszalny — głośnik telefonu i tak prawie nie oddaje tak niskich tonów.
+// Zwraca funkcję wyłączającą.
+function uruchomPodtrzymanie(ctx) {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = 40;
+  g.gain.value = 0.003;
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.start();
+  return () => {
+    try {
+      osc.stop();
+      osc.disconnect();
+      g.disconnect();
+    } catch (err) {
+      // już zatrzymany — ignorujemy
+    }
+  };
+}
+
 // Uwaga: Safari na iOS nie wspiera navigator.vibrate w ogóle — ani w
 // przeglądarce, ani w PWA. Na Androidzie zadziała.
 function zawibruj() {
@@ -83,6 +109,7 @@ export function createTimerWidget(pobierzPresety) {
   let container = null;
   // Sygnał zaplanowany w zegarze audio: { ctx, czasAudio, wyjscie }
   let gong = null;
+  let zatrzymajPodtrzymanie = null;
 
   function presety() {
     const lista = pobierzPresety?.();
@@ -130,6 +157,11 @@ export function createTimerWidget(pobierzPresety) {
     odswiez();
   }
 
+  function wylaczPodtrzymanie() {
+    if (zatrzymajPodtrzymanie) zatrzymajPodtrzymanie();
+    zatrzymajPodtrzymanie = null;
+  }
+
   function anulujGong() {
     if (!gong) return;
     try {
@@ -158,7 +190,9 @@ export function createTimerWidget(pobierzPresety) {
     odswiez();
     // Po chwili wracamy do rzędu presetów — bez dodatkowego klikania.
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
+    // Podtrzymanie wyłączamy dopiero po wybrzmieniu gongu (~1.5 s).
     timeoutKoniec = setTimeout(() => {
+      wylaczPodtrzymanie();
       if (status !== "koniec") return;
       status = "idle";
       odswiez();
@@ -169,6 +203,7 @@ export function createTimerWidget(pobierzPresety) {
     zatrzymajInterval();
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
     anulujGong();
+    wylaczPodtrzymanie();
     const dlugosc = Math.max(1, Math.round(Number(sek) || 60));
     koniecTs = Date.now() + dlugosc * 1000;
     // Kontekst tworzony w geście usera; gong od razu wpięty w oś czasu audio.
@@ -177,6 +212,7 @@ export function createTimerWidget(pobierzPresety) {
       try {
         const czasAudio = ctx.currentTime + dlugosc;
         gong = { ctx, czasAudio, wyjscie: zaplanujGong(ctx, czasAudio) };
+        zatrzymajPodtrzymanie = uruchomPodtrzymanie(ctx);
       } catch (err) {
         gong = null;
       }
@@ -192,6 +228,7 @@ export function createTimerWidget(pobierzPresety) {
   function przerwij() {
     zatrzymajInterval();
     anulujGong();
+    wylaczPodtrzymanie();
     document.removeEventListener("visibilitychange", naPowrocie);
     if (timeoutKoniec) clearTimeout(timeoutKoniec);
     status = "idle";
